@@ -1,7 +1,7 @@
 .container {
   font-family: system-ui, Arial, sans-serif;
   padding: 12px;
-  width: 420px;
+  max-width: 420px;
 }
 
 h1 {
@@ -33,3 +33,36 @@ h1 {
 }
 
 .log-line { margin: 6px 0; white-space: pre-wrap }
+
+/* Android specific */
+.android {
+  .sample-section textarea, .log-box {
+    height: 60vh;
+  }
+
+  #shareBtn {
+    display: none; /* shown dynamically by JS when appropriate */
+    box-sizing: border-box;
+    width: 100%;
+    padding: 12px 14px;
+    margin: 12px 0;
+    font-size: 16px;
+    border-radius: 8px;
+    border: 1px solid rgba(0,0,0,0.2);
+    -webkit-appearance: button;
+    appearance: button;
+    font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial;
+    text-align: center;
+    cursor: pointer;
+  }
+
+  #shareBtn:active {
+    transform: translateY(1px);
+    opacity: 0.98;
+  }
+
+  #shareBtn:focus {
+    outline: 3px solid;
+    outline-offset: 2px;
+  }
+}

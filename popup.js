@@ -74,25 +74,34 @@ async function runTranslatorOffscreen(translatorPaths, url) {
 
 // Listen for offscreen results
 chrome.runtime.onMessage.addListener((msg) => {
-  if (!msg || msg.type !== "offscreenResult") return;
-  const bib = document.getElementById("bibEntry");
-  const error = msg.error;
-  const result = msg.result;
-  if (error) {
-    appendLog(`Error: ${error}`);
-    return;
-  }
-  appendLog(`Received result for ${msg.url}`);
-  if (bib) {
-    if (typeof result === "string") bib.value = result;
-    else bib.value = JSON.stringify(result, null, 2);
-    // Send to JabRef automatically
-    sendBibEntry();
-  } else {
-    appendLog(
-      typeof result === "string" ? result : JSON.stringify(result, null, 2),
-    );
-  }
+    if (!msg || msg.type !== "offscreenResult") return;
+    const bib = document.getElementById("bibEntry");
+    const error = msg.error;
+    const result = msg.result;
+    if (error) {
+        appendLog(`Error: ${error}`);
+        return;
+    }
+    appendLog(`Received result for ${msg.url}`);
+    if (bib) {
+        if (typeof result === "string") bib.value = result;
+        else bib.value = JSON.stringify(result, null, 2);
+        // On Android Firefox: require an explicit user gesture to invoke the share sheet
+        if (isAndroidFirefox()) {
+            const shareBtn = document.getElementById('shareBtn');
+            if (shareBtn) {
+                shareBtn.style.display = 'inline-block';
+                appendLog('Tap Share to send the BibTeX via the Android share sheet', 'info');
+            } else {
+                appendLog('Ready to share — please trigger send manually', 'info');
+            }
+        } else {
+            // Send to JabRef automatically for non-Android-Firefox environments
+            sendBibEntry();
+        }
+    } else {
+        appendLog(typeof result === "string" ? result : JSON.stringify(result, null, 2));
+    }
 });
 
 function appendLog(text) {
@@ -120,6 +129,15 @@ function appendLog(text) {
   log.scrollTop = log.scrollHeight;
 }
 
+// Detect Android Firefox (basic UA check)
+function isAndroidFirefox() {
+    try {
+        const ua = navigator.userAgent || '';
+        return /Android/i.test(ua) && /Firefox/i.test(ua);
+    } catch (e) {
+        return false;
+    }
+}
 // Update connection status
 function updateStatus(status, className) {
   const statusEl = document.getElementById("status");
@@ -175,10 +193,76 @@ async function sendBibEntry() {
   const bibEntryTextarea = document.getElementById("bibEntry");
   const bibEntry = bibEntryTextarea.value.trim();
 
-  if (!bibEntry) {
-    appendLog("BibTeX entry is empty", "error");
-    return;
-  }
+    if (!bibEntry) {
+        appendLog("BibTeX entry is empty", "error");
+        return;
+    }
+
+    // If running on Android Firefox, prefer the Web Share API (native share sheet)
+    if (isAndroidFirefox()) {
+        appendLog('Detected Android Firefox — using native share', 'info');
+        const shareText = bibEntry;
+        try {
+            if (navigator.share && typeof navigator.share === 'function') {
+                await navigator.share({ title: 'BibTeX entry', text: shareText });
+                appendLog('Shared via Android share sheet', 'success');
+                return true;
+            }
+            // Fallback: copy to clipboard
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                await navigator.clipboard.writeText(shareText);
+                appendLog('Share API not available — copied BibTeX to clipboard', 'info');
+                return true;
+            }
+            appendLog('Sharing not available on this device', 'error');
+            return false;
+        } catch (e) {
+            appendLog(`Share failed: ${e && e.message ? e.message : String(e)}`, 'error');
+            try {
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    await navigator.clipboard.writeText(shareText);
+                    appendLog('Copied BibTeX to clipboard as fallback', 'info');
+                    return true;
+                }
+            } catch (e2) {
+                // ignore
+            }
+            return false;
+        }
+    }
+
+    // If running on Android Firefox, prefer the Web Share API (native share sheet)
+    if (isAndroidFirefox()) {
+        appendLog('Detected Android Firefox — using native share', 'info');
+        const shareText = bibEntry;
+        try {
+            if (navigator.share && typeof navigator.share === 'function') {
+                await navigator.share({ title: 'BibTeX entry', text: shareText });
+                appendLog('Shared via Android share sheet', 'success');
+                return true;
+            }
+            // Fallback: copy to clipboard
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                await navigator.clipboard.writeText(shareText);
+                appendLog('Share API not available — copied BibTeX to clipboard', 'info');
+                return true;
+            }
+            appendLog('Sharing not available on this device', 'error');
+            return false;
+        } catch (e) {
+            appendLog(`Share failed: ${e && e.message ? e.message : String(e)}`, 'error');
+            try {
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    await navigator.clipboard.writeText(shareText);
+                    appendLog('Copied BibTeX to clipboard as fallback', 'info');
+                    return true;
+                }
+            } catch (e2) {
+                // ignore
+            }
+            return false;
+        }
+    }
 
   const base = jabrefBaseUrl || (await getBaseUrl());
   if (!base) {
@@ -225,27 +309,38 @@ async function sendBibEntry() {
   }
 }
 
-document.addEventListener("DOMContentLoaded", async () => {
-  // Auto-connect when popup opens
-  const connected = await connectToJabRef();
-  const urlEl = document.getElementById("url");
-  if (!connected) {
-    appendLog(
-      "If JabRef is running, enable the HTTP server (Options → Preferences → Advanced → Remote operation → enable) and ensure the configured port is correct: https://github.com/JabRef/JabRef-Browser-Extension/blob/main/SETUP.md",
-      "warning",
-    );
-    document.getElementById("log-box").open = true;
-    // show fallback UI
-    const noneEl = document.getElementById("none");
-    if (noneEl) noneEl.style.display = "block";
-    return;
-  }
-  try {
-    if (!window.chrome || !chrome.tabs) {
-      urlEl.textContent = "Chrome extension APIs not available.";
-      document.getElementById("none").style.display = "block";
-      return;
+
+document.addEventListener('DOMContentLoaded', async () => {
+    // Auto-connect when popup opens
+    if (isAndroidFirefox()) {
+        appendLog('Detected Android Firefox — using native share for sending entries', 'info');
+        document.documentElement.classList.add('android');
+        // Disable UI elements not needed for Android Firefox
+        const statusEl = document.getElementById('status');
+        statusEl.innerText = 'Using native Android share';
+        statusEl.className = 'status-connected';
+    } else {
+        const connected = await connectToJabRef();
+        const urlEl = document.getElementById('url');
+        if (!connected) {
+            appendLog(
+                "If JabRef is running, enable the HTTP server (Options → Preferences → Advanced → Remote operation → enable) and ensure the configured port is correct: https://github.com/LyzardKing/JabRef-Connector/blob/main/SETUP.md",
+                "warning");
+            document.getElementById('log-box').open = true;
+            // show fallback UI
+            const noneEl = document.getElementById('none');
+            if (noneEl) noneEl.style.display = 'block';
+            return;
+        }
     }
+
+    const urlEl = document.getElementById('url');
+    try {
+        if (!window.chrome || !chrome.tabs) {
+            urlEl.textContent = 'Chrome extension APIs not available.';
+            document.getElementById('none').style.display = 'block';
+            return;
+        }
 
     const tab = await new Promise((resolve) => {
       chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
@@ -271,18 +366,29 @@ document.addEventListener("DOMContentLoaded", async () => {
       return;
     }
 
-    renderResults(url, matches || []);
-    if (matches && matches.length) {
-      // Build array of translator URLs and request background/offscreen
-      const translatorPaths = matches.map((m) =>
-        chrome.runtime.getURL(m.path || ""),
-      );
-      runTranslatorOffscreen(translatorPaths, url);
+        renderResults(url, matches || []);
+        if (matches && matches.length) {
+            // Build array of translator URLs and request background/offscreen
+            const translatorPaths = matches.map(m => chrome.runtime.getURL(m.path || ''));
+            runTranslatorOffscreen(translatorPaths, url);
+        }
+    } catch (e) {
+        console.error('Popup initialization error', e);
+        urlEl.textContent = 'Popup error: ' + (e && e.message ? e.message : String(e));
+        document.getElementById('none').style.display = 'block';
     }
-  } catch (e) {
-    console.error("Popup initialization error", e);
-    urlEl.textContent =
-      "Popup error: " + (e && e.message ? e.message : String(e));
-    document.getElementById("none").style.display = "block";
-  }
+
+    // Wire the Share button to sendBibEntry() so share() is called on a user gesture
+    const shareBtn = document.getElementById('shareBtn');
+    if (shareBtn) {
+        shareBtn.style.display = 'none';
+        shareBtn.addEventListener('click', async () => {
+            try {
+                shareBtn.disabled = true;
+                await sendBibEntry();
+            } finally {
+                shareBtn.disabled = false;
+            }
+        });
+    }
 });
