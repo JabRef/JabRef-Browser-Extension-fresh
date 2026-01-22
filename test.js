@@ -2,19 +2,23 @@
 // Test runner: executes runTranslatorOnHtml on the testCases defined in
 // translators/zotero/ScienceDirect.js
 
-const fs = require('fs');
-const path = require('path');
-const vm = require('vm');
-const util = require('util');
+import { createWriteStream, mkdirSync, existsSync, promises, readFileSync, readdir } from 'fs';
+import { join, dirname } from 'path';
+import { createContext, runInContext } from 'vm';
+import { inspect } from 'util';
+
+// Compute root directory compatible with ESM `import.meta.url` and
+// legacy CommonJS `__dirname`.
+const ROOT_DIR = (typeof __dirname !== 'undefined') ? __dirname : dirname(new URL(import.meta.url).pathname);
 
 // Create a log file and duplicate console output to it.
-const LOG_PATH = path.join(__dirname, 'test.log');
+const LOG_PATH = join(ROOT_DIR, 'test.log');
 try {
     // append mode so repeated runs accumulate; you can change to 'w' to overwrite
-    const logStream = fs.createWriteStream(LOG_PATH, { flags: 'a' });
+    const logStream = createWriteStream(LOG_PATH, { flags: 'a' });
     const writeLog = (...args) => {
         try {
-            const line = args.map(a => (typeof a === 'string' ? a : util.inspect(a, { depth: null }))).join(' ');
+            const line = args.map(a => (typeof a === 'string' ? a : inspect(a, { depth: null }))).join(' ');
             logStream.write(line + '\n');
         } catch (e) {
             // ignore logging errors
@@ -38,12 +42,43 @@ try {
     console.error('Failed to initialize log file', e && e.message ? e.message : e);
 }
 
+// Directory to cache fetched HTML between test runs. This speeds up repeated
+// runs and reduces network requests when iterating on translators.
+const CACHE_DIR = join(ROOT_DIR, 'test_cache');
+try {
+    mkdirSync(CACHE_DIR, { recursive: true });
+} catch (e) {}
+
+function urlToCacheName(url) {
+    // base64url encode the URL to a safe filename
+    const b = Buffer.from(String(url || ''), 'utf8').toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    return b + '.html';
+}
+
+async function readCachedHtml(url) {
+    try {
+        const fname = join(CACHE_DIR, urlToCacheName(url));
+        if (existsSync(fname)) {
+            return await promises.readFile(fname, 'utf8');
+        }
+    } catch (e) {}
+    return null;
+}
+
+async function writeCachedHtml(url, html) {
+    try {
+        const fname = join(CACHE_DIR, urlToCacheName(url));
+        await promises.writeFile(fname, html, 'utf8');
+    } catch (e) {}
+}
+
 
 async function run_on_file(filename, singleTestIndex) {
     // Ensure DOMParser and a fetch implementation are available for translatorRunner
     let JSDOM;
     try {
-        JSDOM = require('jsdom').JSDOM;
+        const jsdomMod = await import('jsdom');
+        JSDOM = jsdomMod.JSDOM;
     } catch (e) {
         console.error('Please install jsdom: npm install jsdom');
         process.exit(1);
@@ -54,14 +89,14 @@ async function run_on_file(filename, singleTestIndex) {
     global.XPathResult = dom.window.XPathResult;
 
     // Dynamic import of the ES module translator runner
-    const trPath = path.join(__dirname, 'sources/translatorRunner.js');
+    const trPath = join(ROOT_DIR, 'sources', 'translatorRunner.js');
     const trModule = await import('file://' + trPath);
     const { runTranslatorOnHtml } = trModule;
 
     // Load ScienceDirect translator source and execute it in a sandbox so we can
     // read the `testCases` variable produced by the translator file.
-    const sdPath = path.join(__dirname, 'translators', 'zotero', filename);
-    const sdSrc = fs.readFileSync(sdPath, 'utf8');
+    const sdPath = join(ROOT_DIR, 'translators', 'zotero', filename);
+    const sdSrc = readFileSync(sdPath, 'utf8');
 
     const sandbox = { console, URL, window: {}, document: {}, DOMParser: global.DOMParser };
     // Minimal ZU shim for detection-time helpers (xpath, xpathText, text, trimInternal)
@@ -97,9 +132,9 @@ async function run_on_file(filename, singleTestIndex) {
         },
         trimInternal: (s) => (s || '').replace(/\s+/g, ' ').trim(),
     };
-    vm.createContext(sandbox);
+    createContext(sandbox);
     try {
-        vm.runInContext(sdSrc, sandbox, { filename: filename });
+        runInContext(sdSrc, sandbox, { filename: filename });
     } catch (e) {
         // Some translators reference globals at load time; warn but continue
         console.warn('Warning: executing translator source threw:', e && e.message);
@@ -161,13 +196,20 @@ async function run_on_file(filename, singleTestIndex) {
                 console.error("arXiv: Legacy Find has been shut off.");
                 continue;
             }
-            const res = await fetch(url, { redirect: 'follow' });
-            const html = await res.text();
+            // Try cache first to avoid refetching the same page across runs
+            let html = await readCachedHtml(url);
+            if (!html) {
+                const res = await fetch(url, { redirect: 'follow' });
+                html = await res.text();
+                // Cache successful fetches for reuse
+                try { await writeCachedHtml(url, html); } catch (e) {}
+            }
+            console.log(`Running translator on cached file: ${urlToCacheName(url)}`);
             const out = await runTranslatorOnHtml(sdFileUrl, html, url);
             if (!out) {
                 throw new Error('No output from translator');
             }
-            console.log('Result:', typeof out === 'string' ? out.slice(0, 1000) : JSON.stringify(out, null, 2));
+            // console.log('Result:', typeof out === 'string' ? out.slice(0, 1000) : JSON.stringify(out, null, 2));
         } catch (e) {
             console.error('Error processing', url, e && e.message);
             if (e.message == "Could not scrape metadata via known methods") {
@@ -200,18 +242,42 @@ if (args.length >= 1) {
     });
 } else {
     // No argument: run on all test files in translators/zotero
-    const translatorsDir = path.join(__dirname, 'translators', 'zotero');
-    fs.readdir(translatorsDir, (err, files) => {
+    const translatorsDir = join(ROOT_DIR, 'translators', 'zotero');
+    readdir(translatorsDir, (err, files) => {
         if (err) {
             console.error('Failed to read translators directory:', err);
             process.exit(1);
         }
         const jsFiles = files.filter(f => f.endsWith('.js'));
         (async () => {
-            for (const f of jsFiles) {
-                console.log(`\n\n######## Running tests for translator file: ${f} ########`);
-                await run_on_file(f);
-            }
+            // Run translator test files in parallel with bounded concurrency to
+            // avoid overwhelming the machine or network. Default concurrency=4.
+            const concurrency = 4;
+            let idx = 0;
+            const results = [];
+
+            const worker = async () => {
+                while (true) {
+                    let cur;
+                    // simple atomic fetch
+                    if (idx >= jsFiles.length) return;
+                    cur = jsFiles[idx++];
+                    console.log(`\n\n######## Running tests for translator file: ${cur} ########`);
+                    try {
+                        await run_on_file(cur);
+                        results.push({ file: cur, ok: true });
+                    } catch (e) {
+                        console.error('Fatal error while running', cur, e);
+                        results.push({ file: cur, ok: false, error: e });
+                    }
+                }
+            };
+
+            const workers = Array.from({ length: Math.min(concurrency, jsFiles.length) }, () => worker());
+            await Promise.all(workers);
+            // Optionally inspect results to decide exit code
+            const failed = results.find(r => !r.ok);
+            if (failed) process.exit(1);
         })().catch(e => {
             console.error('Fatal error:', e);
             process.exit(1);
