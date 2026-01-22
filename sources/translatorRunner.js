@@ -31,12 +31,12 @@ export async function runTranslatorOnHtml(
       // forms are:
       // - file://...  (Node.js test harnesses; handled by the legacy
       //   evaluation fallback below)
-      // - chrome-extension://, moz-extension://, ms-browser-extension://
+      // - chrome-extension://, moz-extension://, ms-browser-extension://, safari-extension://
       //   (handled by the browser script injection fallback below)
       // Other callers should pass an already-imported module object.
       const p = translatorModuleOrPath;
       if (
-        !(p && (p.startsWith('file://') || p.startsWith('chrome-extension://') || p.startsWith('moz-extension://') || p.startsWith('ms-browser-extension://')))
+        !(p && (p.startsWith('file://') || p.startsWith('chrome-extension://') || p.startsWith('moz-extension://') || p.startsWith('ms-browser-extension://') || p.startsWith('safari-extension://')))
       ) {
         throw new Error('Unsafe/unsupported translator path string; pass a module object instead for non-extension/local paths');
       }
@@ -126,7 +126,7 @@ export async function runTranslatorOnHtml(
     if (
       (!module || (typeof module.detect !== "function" && typeof module.detectWeb !== "function" && typeof module.translate !== "function" && typeof module.doWeb !== "function")) &&
       typeof translatorModuleOrPath === "string" &&
-      (translatorModuleOrPath.startsWith('chrome-extension://') || translatorModuleOrPath.startsWith('moz-extension://') || translatorModuleOrPath.startsWith('ms-browser-extension://')) &&
+      (translatorModuleOrPath.startsWith('chrome-extension://') || translatorModuleOrPath.startsWith('moz-extension://') || translatorModuleOrPath.startsWith('ms-browser-extension://') || translatorModuleOrPath.startsWith('safari-extension://')) &&
       typeof document !== 'undefined' && typeof document.createElement === 'function'
     ) {
       try {
