@@ -192,11 +192,10 @@ def process_file(path: Path) -> tuple[bool, bool]:
         commented = True
         changed = True
 
-    # new_text2, did_append = append_exports(new_text)
-    # if did_append:
-    #     appended = True
-    #     changed = True
-    new_text2 = new_text
+    new_text2, did_append = append_exports(new_text)
+    if did_append:
+        appended = True
+        changed = True
 
     if changed:
         # backup original

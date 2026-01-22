@@ -5,6 +5,7 @@
     "test": "node test.js arXiv.org.js"
   },
   "dependencies": {
-    "jsdom": "^27.4.0"
+    "jsdom": "^27.4.0",
+    "linkedom": "^0.18.12"
   }
 }

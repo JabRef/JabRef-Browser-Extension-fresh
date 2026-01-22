@@ -1,8 +1,27 @@
-async function findMatchesForUrl(url) {
-  const manifestUrl = chrome.runtime.getURL("translators/manifest.json");
-  const resp = await fetch(manifestUrl);
-  const list = await resp.json();
+async function fetchManifest() {
+  try {
+    const manifestUrl = chrome.runtime.getURL("translators/manifest.json");
+    const resp = await fetch(manifestUrl);
+    if (!resp.ok) throw new Error(`Failed to load manifest: ${resp.status} ${resp.statusText}`);
+    return await resp.json();
+  } catch (e) {
+    console.warn("Error fetching manifest directly, trying background fallback", e);
+    return new Promise((resolve, reject) => {
+      chrome.runtime.sendMessage({ type: "getManifest" }, (resp) => {
+        if (chrome.runtime.lastError) {
+          reject(new Error(chrome.runtime.lastError.message));
+        } else if (resp && resp.ok) {
+          resolve(resp.manifest);
+        } else {
+          reject(new Error(resp ? resp.error : "Unknown error fetching manifest via background"));
+        }
+      });
+    });
+  }
+}
 
+async function findMatchesForUrl(url) {
+  const list = await fetchManifest();
   const matches = [];
   for (const entry of list) {
     const target = (entry && entry.target) || "";
@@ -21,10 +40,11 @@ async function findMatchesForUrl(url) {
 function renderResults(url, matches) {
   const log = document.getElementById("log");
   const bib = document.getElementById("bibEntry");
-  // Log the URL
-  appendLog(`URL: ${url}`);
+  appendLog(`URL: ${url}`, "info");
   if (!matches || !matches.length) {
-    appendLog("No matching translators found.");
+    appendLog("No matching translators found for this URL.", "warning");
+    appendLog("Try searching for the paper on a supported site like Google Scholar, DOI.org, or a publisher's page.", "info");
+    document.getElementById("log-box").open = true;
     return;
   }
 }
@@ -79,10 +99,11 @@ chrome.runtime.onMessage.addListener((msg) => {
   const error = msg.error;
   const result = msg.result;
   if (error) {
-    appendLog(`Error: ${error}`);
+    appendLog(`Error: ${error}`, "error");
+    document.getElementById("log-box").open = true;
     return;
   }
-  appendLog(`Received result for ${msg.url}`);
+  appendLog(`Received result for ${msg.url}`, "success");
   if (bib) {
     if (typeof result === "string") bib.value = result;
     else bib.value = JSON.stringify(result, null, 2);
@@ -91,15 +112,16 @@ chrome.runtime.onMessage.addListener((msg) => {
   } else {
     appendLog(
       typeof result === "string" ? result : JSON.stringify(result, null, 2),
+      "info"
     );
   }
 });
 
-function appendLog(text) {
+function appendLog(text, level = "info") {
   const log = document.getElementById("log");
   if (!log) return;
   const d = document.createElement("div");
-  d.className = "log-line";
+  d.className = `log-line log-${level}`;
   // Convert URLs in the text into clickable links
   // Split the text keeping URLs (captures https?://...)
   const parts = text.split(/(https?:\/\/(docs.jabref.org|github.com)[^\s]+)/);
@@ -118,6 +140,7 @@ function appendLog(text) {
   }
   log.appendChild(d);
   log.scrollTop = log.scrollHeight;
+  console.log(`[${level}] ${text}`);
 }
 
 // Update connection status
@@ -264,10 +287,13 @@ document.addEventListener("DOMContentLoaded", async () => {
       matches = await findMatchesForUrl(url);
     } catch (e) {
       console.error("Error fetching translators manifest", e);
-      urlEl.textContent =
-        "Error reading translators manifest: " +
-        (e && e.message ? e.message : String(e));
-      document.getElementById("none").style.display = "block";
+      if (urlEl) {
+        urlEl.textContent =
+          "Error reading translators manifest: " +
+          (e && e.message ? e.message : String(e));
+      }
+      const noneEl = document.getElementById("none");
+      if (noneEl) noneEl.style.display = "block";
       return;
     }
 
@@ -281,8 +307,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   } catch (e) {
     console.error("Popup initialization error", e);
-    urlEl.textContent =
-      "Popup error: " + (e && e.message ? e.message : String(e));
-    document.getElementById("none").style.display = "block";
+    if (urlEl) {
+      urlEl.textContent =
+        "Popup error: " + (e && e.message ? e.message : String(e));
+    }
+    const noneEl = document.getElementById("none");
+    if (noneEl) noneEl.style.display = "block";
   }
 });

@@ -35,13 +35,19 @@ export async function runTranslatorOnHtml(
       //   (handled by the browser script injection fallback below)
       // Other callers should pass an already-imported module object.
       const p = translatorModuleOrPath;
+      console.debug("[translatorRunner] checking path:", p);
       if (
-        !(p && (p.startsWith('file://') || p.startsWith('chrome-extension://') || p.startsWith('moz-extension://') || p.startsWith('ms-browser-extension://') || p.startsWith('safari-extension://')))
+        !(p && (p.startsWith('file://') || p.startsWith('chrome-extension://') || p.startsWith('moz-extension://') || p.startsWith('ms-browser-extension://') || p.startsWith('safari-extension://') || p.startsWith('safari-web-extension://')))
       ) {
-        throw new Error('Unsafe/unsupported translator path string; pass a module object instead for non-extension/local paths');
+        throw new Error(`Unsafe/unsupported translator path string (${p}); pass a module object instead for non-extension/local paths`);
       }
       // Defer actual handling to the legacy/file/extension code paths below.
       loaded = null;
+      try {
+        loaded = await import(p);
+      } catch (e) {
+        console.warn("[translatorRunner] dynamic import failed, will try fallbacks", e);
+      }
     } else {
       loaded = translatorModuleOrPath;
       console.debug("[translatorRunner] using provided module object");
@@ -126,7 +132,7 @@ export async function runTranslatorOnHtml(
     if (
       (!module || (typeof module.detect !== "function" && typeof module.detectWeb !== "function" && typeof module.translate !== "function" && typeof module.doWeb !== "function")) &&
       typeof translatorModuleOrPath === "string" &&
-      (translatorModuleOrPath.startsWith('chrome-extension://') || translatorModuleOrPath.startsWith('moz-extension://') || translatorModuleOrPath.startsWith('ms-browser-extension://') || translatorModuleOrPath.startsWith('safari-extension://')) &&
+      (translatorModuleOrPath.startsWith('chrome-extension://') || translatorModuleOrPath.startsWith('moz-extension://') || translatorModuleOrPath.startsWith('ms-browser-extension://') || translatorModuleOrPath.startsWith('safari-extension://') || translatorModuleOrPath.startsWith('safari-web-extension://')) &&
       typeof document !== 'undefined' && typeof document.createElement === 'function'
     ) {
       try {
@@ -152,7 +158,7 @@ export async function runTranslatorOnHtml(
     }
 
     // create a DOM from the html string
-    const parser = new DOMParser();
+    const parser = new (typeof DOMParser !== 'undefined' ? DOMParser : root.DOMParser)();
     const doc = parser.parseFromString(htmlString || "", "text/html");
     // Ensure `doc.location` exists so legacy translators can access href/pathname
     try {
@@ -160,6 +166,12 @@ export async function runTranslatorOnHtml(
         doc.location = new URL(url);
       } else if (!doc.location) {
         doc.location = { href: '', pathname: '' };
+      }
+      if (doc.location && !doc.location.pathname && url) {
+        try {
+          const u = new URL(url);
+          doc.location.pathname = u.pathname;
+        } catch (e) {}
       }
     } catch (e) {
       // ignore
@@ -224,6 +236,10 @@ export async function runTranslatorOnHtml(
       }
     } catch (e) {
       console.warn('[translatorRunner] failed to create ZU/Zotero shims for detection', e);
+    }
+
+    if (!module) {
+      throw new Error(`Failed to load translator module from ${translatorModuleOrPath}`);
     }
 
     // Two detection styles supported:
@@ -331,7 +347,8 @@ export async function runTranslatorOnHtml(
       });
       root.requestDocument = (async (u, opts) => {
         const txt = await root.requestText(u, opts);
-        return new DOMParser().parseFromString(txt, "text/html");
+        const parser = new (typeof DOMParser !== 'undefined' ? DOMParser : root.DOMParser)();
+        return parser.parseFromString(txt, "text/html");
       });
 
       // Ensure ZU.requestDocument resolves relative URLs as well

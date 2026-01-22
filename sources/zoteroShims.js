@@ -103,7 +103,8 @@ export function createZU(doc, { baseUrl } = {}) {
       const r = await fetch(absolute, opts);
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
       const txt = await r.text();
-      return new DOMParser().parseFromString(txt, 'text/html');
+      const parser = new (typeof DOMParser !== 'undefined' ? DOMParser : globalThis.DOMParser)();
+      return parser.parseFromString(txt, 'text/html');
     },
 
     // Minimal ISBN/ISSN cleaners used by some translators
@@ -125,7 +126,8 @@ export function createZU(doc, { baseUrl } = {}) {
         const absolute = resolveUrl(u);
         const res = await fetch(absolute);
         const text = await res.text();
-        const responseDoc = new DOMParser().parseFromString(text, 'text/html');
+        const parser = new (typeof DOMParser !== 'undefined' ? DOMParser : globalThis.DOMParser)();
+        const responseDoc = parser.parseFromString(text, 'text/html');
         if (callback) callback(text, responseDoc, u);
       } catch (e) {
         if (callback) callback(null, null, u);
