@@ -63,6 +63,12 @@ node test.js <translator-file.js>
 While it is possible to run tests without a specific translator file, providing one will limit the tests to only those defined in that file.
 If a translator does not work as intended the tests can help identify issues (e.g., missing zotero shims).
 
+## CI/CD
+
+This project uses GitHub Actions to automatically build the extension and create a new GitHub Release with the built artifacts.
+
+The workflow is triggered when a new tag starting with `v` (e.g., `v1.0.3`) is pushed.
+
 ## Troubleshooting
 
 - If connection fails, open popup DevTools and inspect the console. The popup provides extended HTTP error logging.
