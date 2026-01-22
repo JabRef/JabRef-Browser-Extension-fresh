@@ -17,5 +17,14 @@ jobs:
       run: python3 scripts/import_and_patch_translators.py
     - name: Install dependencies
       run: npm install
+    - name: Verify linkedom bundle consistency
+      run: |
+        npm run bundle-linkedom
+        if [ -n "$(git status --porcelain sources/vendor/linkedom.js)" ]; then
+          echo "Error: sources/vendor/linkedom.js is out of date or has manual changes."
+          echo "Please run 'npm run bundle-linkedom' and commit the changes."
+          git diff sources/vendor/linkedom.js
+          exit 1
+        fi
     - name: Run tests
       run: npm test

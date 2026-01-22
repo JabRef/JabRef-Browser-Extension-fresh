@@ -1,3 +1,6 @@
 [submodule "translators/zotero"]
 	path = translators/zotero
 	url = https://github.com/zotero/translators
+[submodule "/Users/christophs/workspace/JabRef-Browser-Extension/translators/zotero"]
+	path = /Users/christophs/workspace/JabRef-Browser-Extension/translators/zotero
+	url = https://github.com/zotero/translators

@@ -2,10 +2,16 @@
   "name": "jabref-browser-extension",
   "description": "Tests for JabRef Connector Extension",
   "scripts": {
-    "test": "node test.js arXiv.org.js"
+    "test": "node test.js arXiv.org.js",
+    "bundle-linkedom": "rollup -c"
   },
   "dependencies": {
     "jsdom": "^27.4.0",
     "linkedom": "^0.18.12"
+  },
+  "devDependencies": {
+    "@rollup/plugin-commonjs": "^28.0.2",
+    "@rollup/plugin-node-resolve": "^16.0.0",
+    "rollup": "^4.32.0"
   }
 }
