@@ -39,7 +39,7 @@ try {
 }
 
 
-async function run_on_file(filename) {
+async function run_on_file(filename, singleTestIndex) {
     // Ensure DOMParser and a fetch implementation are available for translatorRunner
     let JSDOM;
     try {
@@ -129,11 +129,26 @@ async function run_on_file(filename) {
     const sdFileUrl = 'file://' + sdPath;
 
     console.log('Found', testCases.length, 'test cases');
-    test_id = 0;
-    
-    for (const tc of testCases) {
-        test_id++;
-        if (!tc || tc.type !== 'web' || tc.items == "multiple") continue;
+    let test_id = 0;
+
+    for (let i = 0; i < testCases.length; i++) {
+        const tc = testCases[i];
+        const position = i + 1;
+
+        // If a single test index was requested, skip others
+        if (singleTestIndex && position !== singleTestIndex) continue;
+
+        test_id = position;
+
+        if (!tc) continue;
+
+        // If the requested single test is not runnable, report and exit early
+        // if (singleTestIndex && (tc.type !== 'web' || tc.items == "multiple")) {
+        //     console.error(`Selected test #${position} is not runnable (type: ${tc.type}, items: ${tc.items})`);
+        //     return;
+        // }
+
+        // if (tc.type !== 'web' || tc.items == "multiple") continue;
         const url = tc.url;
         console.log(`\n=== Test case #${test_id}/${testCases.length}: ${url} ===`);
         try {
@@ -149,10 +164,10 @@ async function run_on_file(filename) {
             console.error('Error processing', url, e && e.message);
             if (e.message == "Could not scrape metadata via known methods") {
                 console.error("Skip this test due to translator inability to scrape metadata.");
-            } else if (url.includes("arxiv.org/") && (url.includes("list/") || url.includes("search/") || url.includes("find/"))) {
-                console.error("Skip this test due to arXiv multiple items page.");
-            }
-            else {
+            // } else if (url.includes("arxiv.org/") && (url.includes("list/") || url.includes("search/") || url.includes("find/"))) {
+            //     console.error("Skip this test due to arXiv multiple items page.");
+            // }
+            } else {
                 break;
             }
         }
@@ -163,7 +178,16 @@ async function run_on_file(filename) {
 const args = process.argv.slice(2);
 if (args.length >= 1) {
     const filename = args[0];
-    run_on_file(filename).catch(e => {
+    const indexArg = args[1];
+    let singleTestIndex = null;
+    if (typeof indexArg !== 'undefined') {
+        singleTestIndex = parseInt(indexArg, 10);
+        if (!Number.isInteger(singleTestIndex) || singleTestIndex < 1) {
+            console.error('Invalid test index. Provide a 1-based positive integer as second argument.');
+            process.exit(1);
+        }
+    }
+    run_on_file(filename, singleTestIndex).catch(e => {
         console.error('Fatal error:', e);
         process.exit(1);
     });

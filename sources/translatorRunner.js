@@ -155,12 +155,28 @@ export async function runTranslatorOnHtml(
     const parser = new DOMParser();
     const doc = parser.parseFromString(htmlString || "", "text/html");
     // Ensure `doc.location` exists so legacy translators can access href/pathname
+    // Some DOM implementations may not allow direct assignment of `document.location`.
+    // Use `Object.defineProperty` to provide a stable location object and mirror it on globals.
     try {
-      if (url) {
-        doc.location = new URL(url);
-      } else if (!doc.location) {
-        doc.location = { href: '', pathname: '' };
+      let locationObj;
+      try {
+        locationObj = url ? new URL(url) : { href: '', pathname: '' };
+      } catch (e) {
+        locationObj = { href: String(url || ''), pathname: '' };
       }
+      try {
+        Object.defineProperty(doc, 'location', { value: locationObj, writable: true, configurable: true });
+      } catch (e) {
+        // Fallback to direct assignment if defining property fails
+        try { doc.location = locationObj; } catch (ee) { }
+      }
+
+      // Ensure global `location` and `window.location` mirror `doc.location`
+      try {
+        const root = typeof window !== "undefined" ? window : globalThis;
+        try { root.location = locationObj; } catch (e) { }
+        try { root.window = root.window || {}; root.window.location = locationObj; } catch (e) { }
+      } catch (e) { }
     } catch (e) {
       // ignore
     }
@@ -184,7 +200,22 @@ export async function runTranslatorOnHtml(
       try { root.doc = doc; } catch (e) { }
       try { root.document = doc; } catch (e) { }
       // fresh Z state
-      root.Z = { debug: () => { }, monitorDOMChanges: () => { }, getHiddenPref: () => false };
+      root.Z = {
+        debug: () => { },
+        monitorDOMChanges: () => { },
+        getHiddenPref: () => false,
+        selectItems: async (items) => {
+          try {
+            const keys = Object.keys(items || {});
+            if (!keys.length) return null;
+            // default: auto-select the first item
+            const k = keys[0];
+            const sel = {};
+            sel[k] = items[k];
+            return sel;
+          } catch (e) { return null; }
+        }
+      };
       // Clear any previous last item so produced item is from this run only
       try { root.Zotero._lastItem = null; } catch (e) { }
       root.attr = ((d, selector, name) => {
@@ -205,9 +236,25 @@ export async function runTranslatorOnHtml(
           const ctx = module.__vmContext;
           try { ctx.ZU = ZU; } catch (e) { }
           try { ctx.Zotero = Zotero; } catch (e) { }
-          try { ctx.doc = doc; } catch (e) { }
-          try { ctx.document = doc; } catch (e) { }
-          try { ctx.Z = { debug: () => { }, monitorDOMChanges: () => { }, getHiddenPref: () => false }; } catch (e) { }
+          try { ctx.doc = docForDetect; } catch (e) { }
+          try { ctx.document = docForDetect; } catch (e) { }
+          try {
+            ctx.Z = {
+              debug: () => { },
+              monitorDOMChanges: () => { },
+              getHiddenPref: () => false,
+              selectItems: async (items) => {
+                try {
+                  const keys = Object.keys(items || {});
+                  if (!keys.length) return null;
+                  const k = keys[0];
+                  const sel = {};
+                  sel[k] = items[k];
+                  return sel;
+                } catch (e) { return null; }
+              }
+            };
+          } catch (e) { }
           try { ctx.Zotero && (ctx.Zotero._lastItem = null); } catch (e) { }
           try {
             ctx.attr = ((d, selector, name) => {
@@ -218,6 +265,9 @@ export async function runTranslatorOnHtml(
             });
           } catch (e) { }
           try { ctx.text = ((d, selector) => ZU.text(d, selector)); } catch (e) { }
+          // Provide `location` and `window.location` in the VM context as well
+          try { ctx.location = docForDetect.location; } catch (e) { }
+          try { ctx.window = ctx.window || {}; ctx.window.location = docForDetect.location; } catch (e) { }
         }
       } catch (e) {
         // non-fatal if VM context cannot be decorated
@@ -226,13 +276,41 @@ export async function runTranslatorOnHtml(
       console.warn('[translatorRunner] failed to create ZU/Zotero shims for detection', e);
     }
 
+    // Create a proxy for `doc` that guarantees a usable `location` property
+    // even if the DOM implementation doesn't expose or allow assignment to
+    // `document.location`. This proxy is used for detection calls so
+    // translators reading `doc.location.pathname` won't see `null`.
+    let docForDetect = doc;
+    try {
+      const loc = (doc && doc.location) || (typeof url !== 'undefined' ? (() => { try { return new URL(url); } catch (e) { return { href: String(url || ''), pathname: '' }; } })() : { href: '', pathname: '' });
+      docForDetect = new Proxy(doc, {
+        get(target, prop, receiver) {
+          if (prop === 'location') return loc;
+          return Reflect.get(target, prop, receiver);
+        },
+      });
+      
+    } catch (e) {
+      try { console.debug('[translatorRunner] debug doc.location ->', doc.location); } catch (ee) { }
+    }
+    // Ensure runner globals point to the proxied document so translator
+    // code accessing global `document`/`doc`/`location` gets the proxied
+    // object with a valid `location`.
+    try {
+      const root = typeof window !== "undefined" ? window : globalThis;
+      try { root.doc = docForDetect; } catch (e) { }
+      try { root.document = docForDetect; } catch (e) { }
+      try { root.location = docForDetect.location; } catch (e) { }
+      try { root.window = root.window || {}; root.window.location = docForDetect.location; } catch (e) { }
+    } catch (e) { }
+
     // Two detection styles supported:
     // - module.detect(doc)          -> for simple module translators
     // - module.detectWeb(doc, url)  -> for Zotero-style translators
     let detected = true;
     if (typeof module.detect === "function") {
       try {
-        detected = module.detect(doc);
+        detected = module.detect(docForDetect);
         console.debug("[translatorRunner] detect() returned", detected);
       } catch (e) {
         console.error("[translatorRunner] detect() threw", e);
@@ -241,7 +319,7 @@ export async function runTranslatorOnHtml(
       if (!detected) throw new Error("Translator.detect returned false");
     } else if (typeof module.detectWeb === "function") {
       try {
-        const kind = module.detectWeb(doc, url);
+        const kind = module.detectWeb(docForDetect, url);
         console.debug("[translatorRunner] detectWeb() returned", kind);
         if (!kind) {
           // Be permissive for test-run environments: when detectWeb returns
@@ -256,10 +334,10 @@ export async function runTranslatorOnHtml(
             throw new Error("Translator.detectWeb returned false");
           }
         }
-        if (kind === "multiple")
-          throw new Error(
-            "Translator returned multiple items; multi-select not supported by runner",
-          );
+        // if (kind === "multiple")
+        //   throw new Error(
+        //     "Translator returned multiple items; multi-select not supported by runner",
+        //   );
       } catch (e) {
         console.error("[translatorRunner] detectWeb() threw", e);
         throw e;
@@ -280,7 +358,7 @@ export async function runTranslatorOnHtml(
     // Execution: prefer `translate(doc)` when available, otherwise run `doWeb(doc,url)` for Zotero-style translators.
     if (typeof module.translate === "function") {
       try {
-        const result = await module.translate(doc);
+        const result = await module.translate(docForDetect);
         console.debug(
           "[translatorRunner] translate() completed; result length:",
           result ? result.length || 0 : 0,
@@ -308,6 +386,16 @@ export async function runTranslatorOnHtml(
         debug: () => { },
         monitorDOMChanges: () => { },
         getHiddenPref: () => false,
+        selectItems: async (items) => {
+          try {
+            const keys = Object.keys(items || {});
+            if (!keys.length) return null;
+            const k = keys[0];
+            const sel = {};
+            sel[k] = items[k];
+            return sel;
+          } catch (e) { return null; }
+        }
       };
       try { root.doc = doc; } catch (e) { }
       try { root.document = doc; } catch (e) { }
@@ -344,9 +432,23 @@ export async function runTranslatorOnHtml(
           const ctx = module.__vmContext;
           ctx.ZU = ZU;
           ctx.Zotero = Zotero;
-          ctx.Z = { debug: () => { }, monitorDOMChanges: () => { }, getHiddenPref: () => false };
-          ctx.doc = doc;
-          ctx.document = doc;
+          ctx.Z = {
+            debug: () => { },
+            monitorDOMChanges: () => { },
+            getHiddenPref: () => false,
+            selectItems: async (items) => {
+              try {
+                const keys = Object.keys(items || {});
+                if (!keys.length) return null;
+                const k = keys[0];
+                const sel = {};
+                sel[k] = items[k];
+                return sel;
+              } catch (e) { return null; }
+            }
+          };
+          ctx.doc = docForDetect;
+          ctx.document = docForDetect;
           ctx.Zotero && (ctx.Zotero._lastItem = null);
                       ctx.attr = ((d, selector, name) => {
               try {
@@ -359,13 +461,16 @@ export async function runTranslatorOnHtml(
             }
           ctx.requestText = root.requestText;
           ctx.requestDocument = root.requestDocument;
+          // Mirror location into VM context as well
+          try { ctx.location = docForDetect.location; } catch (e) { }
+          try { ctx.window = ctx.window || {}; ctx.window.location = docForDetect.location; } catch (e) { }
         }
       } catch (e) {
         // continue if decorating VM context fails
       }
 
       try {
-        await module.doWeb(doc, url);
+        await module.doWeb(docForDetect, url);
       } catch (e) {
         // Some translators may attempt to fetch auxiliary resources (e.g.
         // citation endpoints) which can legitimately 404 in test/offline
