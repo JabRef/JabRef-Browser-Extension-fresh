@@ -2,6 +2,7 @@
   "name": "jabref-browser-extension",
   "description": "Tests for JabRef Connector Extension",
   "scripts": {
+    "run": "web-ext run --firefox-binary 'firefox-developer' --start-url=https://arxiv.org/abs/1707.08567",
     "test": "node test.js arXiv.org.js"
   },
   "dependencies": {

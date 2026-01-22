@@ -361,35 +361,44 @@ export function createShims(doc, url) {
 
   const text = (d, selector) => ZU.text(d, selector);
 
-  function installToRoot(root, useDoc) {
+  // installToRoot(root, useDoc, realDoc)
+  // - `useDoc`: object to expose as `doc` (may be a proxy with location fixes)
+  // - `realDoc` (optional): the actual Document object to expose as `document`
+  // This separation ensures `document.querySelector` is called on a genuine
+  // Document in environments (like Firefox) that validate object interfaces.
+  function installToRoot(root, useDoc, realDoc) {
     try { root.ZU = ZU; } catch (e) {}
     try { root.Zotero = Zotero; } catch (e) {}
     try { root.Z = Z; } catch (e) {}
     try { root.doc = useDoc; } catch (e) {}
-    try { root.document = useDoc; } catch (e) {}
+    try { root.document = realDoc || useDoc; } catch (e) {}
     try { root.Zotero && (root.Zotero._lastItem = null); } catch (e) {}
     try { root.attr = attr; } catch (e) {}
     try { root.text = text; } catch (e) {}
     try { root.requestText = requestText; } catch (e) {}
     try { root.requestDocument = requestDocument; } catch (e) {}
     try { root.ZU.requestDocument = requestDocument; } catch (e) {}
-    try { root.location = useDoc && useDoc.location; } catch (e) {}
-    try { root.window = root.window || {}; root.window.location = useDoc && useDoc.location; } catch (e) {}
+    try { root.location = (realDoc && realDoc.location) || (useDoc && useDoc.location); } catch (e) {}
+    try { root.window = root.window || {}; root.window.location = (realDoc && realDoc.location) || (useDoc && useDoc.location); } catch (e) {}
   }
 
-  function installToVm(ctx, useDoc) {
+  // installToVm(ctx, useDoc, realDoc)
+  // Similar to installToRoot: expose `doc` as `useDoc` (proxy) but set
+  // `document` to the real Document when available so VM code that calls
+  // `document.querySelector` operates on a proper Document implementation.
+  function installToVm(ctx, useDoc, realDoc) {
     try { ctx.ZU = ZU; } catch (e) {}
     try { ctx.Zotero = Zotero; } catch (e) {}
     try { ctx.Z = Z; } catch (e) {}
     try { ctx.doc = useDoc; } catch (e) {}
-    try { ctx.document = useDoc; } catch (e) {}
+    try { ctx.document = realDoc || useDoc; } catch (e) {}
     try { ctx.Zotero && (ctx.Zotero._lastItem = null); } catch (e) {}
     try { ctx.attr = attr; } catch (e) {}
     try { ctx.text = (d, selector) => ZU.text(d, selector); } catch (e) {}
     try { ctx.requestText = requestText; } catch (e) {}
     try { ctx.requestDocument = requestDocument; } catch (e) {}
-    try { ctx.location = useDoc && useDoc.location; } catch (e) {}
-    try { ctx.window = ctx.window || {}; ctx.window.location = useDoc && useDoc.location; } catch (e) {}
+    try { ctx.location = (realDoc && realDoc.location) || (useDoc && useDoc.location); } catch (e) {}
+    try { ctx.window = ctx.window || {}; ctx.window.location = (realDoc && realDoc.location) || (useDoc && useDoc.location); } catch (e) {}
   }
 
   return { ZU, Zotero, Z, requestText, requestDocument, attr, text, installToRoot, installToVm };

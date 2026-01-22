@@ -188,22 +188,38 @@ export async function runTranslatorOnHtml(
 
     // Shims for detection are installed after creating a proxied document
 
-    // Create a proxy for `doc` that guarantees a usable `location` property
-    // even if the DOM implementation doesn't expose or allow assignment to
-    // `document.location`. This proxy is used for detection calls so
-    // translators reading `doc.location.pathname` won't see `null`.
+    // Prepare a `docForDetect` to present to translators during detection.
+    // In browser environments (e.g. Firefox) wrapping a native Document in a
+    // Proxy breaks native DOM interface checks (methods like
+    // `querySelector`/`evaluate` validate the receiver). Therefore, prefer
+    // assigning/defining `doc.location` directly on the real Document when
+    // running in a browser. Only fall back to a Proxy in Node-like contexts
+    // where `doc` is an object created by jsdom that tolerates Proxy wrapping.
     let docForDetect = doc;
     try {
       const loc = (doc && doc.location) || (typeof url !== 'undefined' ? (() => { try { return new URL(url); } catch (e) { return { href: String(url || ''), pathname: '' }; } })() : { href: '', pathname: '' });
-      docForDetect = new Proxy(doc, {
-        get(target, prop, receiver) {
-          if (prop === 'location') return loc;
-          return Reflect.get(target, prop, receiver);
-        },
-      });
-      
+
+      const isBrowserDocument = (typeof window !== 'undefined') && (typeof Document !== 'undefined') && (doc instanceof Document);
+      if (isBrowserDocument) {
+        // Try to define `location` on the real Document. Some engines may
+        // prevent this; attempt gracefully and fall back to assignment.
+        try {
+          Object.defineProperty(doc, 'location', { value: loc, writable: true, configurable: true });
+        } catch (e) {
+          try { doc.location = loc; } catch (ee) { /* ignore */ }
+        }
+        docForDetect = doc;
+      } else {
+        // Node/jsdom or other non-browser environments: Proxy is acceptable.
+        docForDetect = new Proxy(doc, {
+          get(target, prop, receiver) {
+            if (prop === 'location') return loc;
+            return Reflect.get(target, prop, receiver);
+          },
+        });
+      }
     } catch (e) {
-      try { console.debug('[translatorRunner] debug doc.location ->', doc.location); } catch (ee) { }
+      try { console.debug('[translatorRunner] debug doc.location ->', doc && doc.location); } catch (ee) { }
     }
     // Install consolidated shims (ZU, Zotero, Z, helpers) and inject them into
     // the runner global and VM context so detection and execution use the
@@ -211,8 +227,10 @@ export async function runTranslatorOnHtml(
     try {
       const root = typeof window !== "undefined" ? window : globalThis;
       const sh = createShims(doc, url);
-      sh.installToRoot(root, docForDetect);
-      try { if (module && module.__vmContext) sh.installToVm(module.__vmContext, docForDetect); } catch (e) { }
+      // Install shims using the proxied `docForDetect` for `doc` while
+      // exposing the real `doc` as `document` so Firefox's DOM checks pass.
+      sh.installToRoot(root, docForDetect, doc);
+      try { if (module && module.__vmContext) sh.installToVm(module.__vmContext, docForDetect, doc); } catch (e) { }
     } catch (e) {
       console.warn('[translatorRunner] failed to install shims for detection', e);
     }
@@ -285,8 +303,8 @@ export async function runTranslatorOnHtml(
       const root = typeof window !== "undefined" ? window : globalThis;
       try {
         const shExec = createShims(doc, url);
-        shExec.installToRoot(root, docForDetect);
-        try { if (module && module.__vmContext) shExec.installToVm(module.__vmContext, docForDetect); } catch (e) {}
+        shExec.installToRoot(root, docForDetect, doc);
+        try { if (module && module.__vmContext) shExec.installToVm(module.__vmContext, docForDetect, doc); } catch (e) {}
       } catch (e) {
         console.warn('[translatorRunner] failed to create shims for execution', e);
       }
@@ -296,14 +314,18 @@ export async function runTranslatorOnHtml(
       } catch (e) {
         // Some translators may attempt to fetch auxiliary resources (e.g.
         // citation endpoints) which can legitimately 404 in test/offline
-        // environments. Treat HTTP 404 as non-fatal and continue so that
-        // the runner can still attempt to produce a best-effort item from
-        // available page metadata. Re-throw other errors.
+        // or restricted extension environments. Treat common network/fetch
+        // failures and HTTP 404 as non-fatal so the runner can still attempt
+        // to produce a best-effort item from available page metadata. Re-throw
+        // other unexpected errors.
         const msg = e && e.message ? String(e.message) : String(e);
-        if (msg.includes('HTTP 404') || msg.includes('404')) {
-          console.warn('[translatorRunner] doWeb encountered 404 — continuing with best-effort extraction', e);
+        const is404 = msg.includes('HTTP 404') || msg.includes('404');
+        const isNetworkError = msg.includes('NetworkError') || msg.includes('Failed to fetch') || msg.includes('network request failed') || msg.includes('net::ERR') || (e && e.name === 'TypeError');
+
+        if (is404 || isNetworkError) {
+          console.warn('[translatorRunner] doWeb encountered network/fetch error — continuing with best-effort extraction', e);
         } else {
-          console.error("[translatorRunner] doWeb threw", e);
+          console.error('[translatorRunner] doWeb threw', e);
           throw e;
         }
       }
