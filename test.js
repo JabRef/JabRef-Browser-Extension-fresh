@@ -133,6 +133,11 @@ async function run_on_file(filename, singleTestIndex) {
 
     for (let i = 0; i < testCases.length; i++) {
         const tc = testCases[i];
+        if (tc.type === 'search') {
+            console.error("arXiv: Skip category.");
+            continue;
+        }
+
         const position = i + 1;
 
         // If a single test index was requested, skip others
@@ -152,21 +157,23 @@ async function run_on_file(filename, singleTestIndex) {
         const url = tc.url;
         console.log(`\n=== Test case #${test_id}/${testCases.length}: ${url} ===`);
         try {
+            if (url.includes("arxiv.org/") && (url.includes("find/") || tc.type === 'search')) {
+                console.error("arXiv: Legacy Find has been shut off.");
+                continue;
+            }
             const res = await fetch(url, { redirect: 'follow' });
             const html = await res.text();
             const out = await runTranslatorOnHtml(sdFileUrl, html, url);
             if (!out) {
                 throw new Error('No output from translator');
-                break;
             }
             console.log('Result:', typeof out === 'string' ? out.slice(0, 1000) : JSON.stringify(out, null, 2));
         } catch (e) {
             console.error('Error processing', url, e && e.message);
             if (e.message == "Could not scrape metadata via known methods") {
                 console.error("Skip this test due to translator inability to scrape metadata.");
-            // } else if (url.includes("arxiv.org/") && (url.includes("list/") || url.includes("search/") || url.includes("find/"))) {
-            //     console.error("Skip this test due to arXiv multiple items page.");
-            // }
+            // } else if (url.includes("arxiv.org/") && url.includes("find/")) {
+            //     console.error("arXiv: Legacy Find has been shut off.");
             } else {
                 break;
             }

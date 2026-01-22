@@ -11,7 +11,7 @@
   translator APIs and used to resolve relative requests.
 */
 
-import { createZU, createZoteroShim } from "./zoteroShims.js";
+import { createShims } from "./zoteroShims.js";
 
 export async function runTranslatorOnHtml(
   translatorModuleOrPath,
@@ -186,95 +186,7 @@ export async function runTranslatorOnHtml(
       ")",
     );
 
-    // Provide minimal ZU/Zotero shims before detection: some translators use ZU in detectWeb()
-    try {
-      const ZU = createZU(doc, { baseUrl: url });
-      const Zotero = createZoteroShim();
-      // Always provide fresh shims and doc globals per run to avoid leaking
-      // state between consecutive translator executions.
-      root.ZU = ZU;
-      root.Zotero = Zotero;
-      // Expose `doc` and `document` globals for legacy translators that
-      // reference `doc`/`document` from nested callbacks executed outside
-      // the original `doWeb` stack.
-      try { root.doc = doc; } catch (e) { }
-      try { root.document = doc; } catch (e) { }
-      // fresh Z state
-      root.Z = {
-        debug: () => { },
-        monitorDOMChanges: () => { },
-        getHiddenPref: () => false,
-        selectItems: async (items) => {
-          try {
-            const keys = Object.keys(items || {});
-            if (!keys.length) return null;
-            // default: auto-select the first item
-            const k = keys[0];
-            const sel = {};
-            sel[k] = items[k];
-            return sel;
-          } catch (e) { return null; }
-        }
-      };
-      // Clear any previous last item so produced item is from this run only
-      try { root.Zotero._lastItem = null; } catch (e) { }
-      root.attr = ((d, selector, name) => {
-        try {
-          const el = (d || doc).querySelector(selector);
-          return el ? el.getAttribute(name) : "";
-        } catch (e) {
-          return "";
-        }
-      });
-      root.text = ((d, selector) => ZU.text(d, selector));
-
-      // If the translator was evaluated into an isolated VM context, inject
-      // the same shims into that context so legacy global references resolve
-      // inside the VM instead of polluting the runner global scope.
-      try {
-        if (module && module.__vmContext) {
-          const ctx = module.__vmContext;
-          try { ctx.ZU = ZU; } catch (e) { }
-          try { ctx.Zotero = Zotero; } catch (e) { }
-          try { ctx.doc = docForDetect; } catch (e) { }
-          try { ctx.document = docForDetect; } catch (e) { }
-          try {
-            ctx.Z = {
-              debug: () => { },
-              monitorDOMChanges: () => { },
-              getHiddenPref: () => false,
-              selectItems: async (items) => {
-                try {
-                  const keys = Object.keys(items || {});
-                  if (!keys.length) return null;
-                  const k = keys[0];
-                  const sel = {};
-                  sel[k] = items[k];
-                  return sel;
-                } catch (e) { return null; }
-              }
-            };
-          } catch (e) { }
-          try { ctx.Zotero && (ctx.Zotero._lastItem = null); } catch (e) { }
-          try {
-            ctx.attr = ((d, selector, name) => {
-              try {
-                const el = (d || doc).querySelector(selector);
-                return el ? el.getAttribute(name) : "";
-              } catch (e) { return ""; }
-            });
-          } catch (e) { }
-          try { ctx.text = ((d, selector) => ZU.text(d, selector)); } catch (e) { }
-          // Provide `location` and `window.location` in the VM context as well
-          try { ctx.location = docForDetect.location; } catch (e) { }
-          try { ctx.window = ctx.window || {}; ctx.window.location = docForDetect.location; } catch (e) { }
-        }
-      } catch (e) {
-        // non-fatal if VM context cannot be decorated
-      }
-    } catch (e) {
-      console.warn('[translatorRunner] failed to create ZU/Zotero shims for detection', e);
-    }
+    // Shims for detection are installed after creating a proxied document
 
     // Create a proxy for `doc` that guarantees a usable `location` property
     // even if the DOM implementation doesn't expose or allow assignment to
@@ -293,16 +205,17 @@ export async function runTranslatorOnHtml(
     } catch (e) {
       try { console.debug('[translatorRunner] debug doc.location ->', doc.location); } catch (ee) { }
     }
-    // Ensure runner globals point to the proxied document so translator
-    // code accessing global `document`/`doc`/`location` gets the proxied
-    // object with a valid `location`.
+    // Install consolidated shims (ZU, Zotero, Z, helpers) and inject them into
+    // the runner global and VM context so detection and execution use the
+    // proxied document with a stable `location`.
     try {
       const root = typeof window !== "undefined" ? window : globalThis;
-      try { root.doc = docForDetect; } catch (e) { }
-      try { root.document = docForDetect; } catch (e) { }
-      try { root.location = docForDetect.location; } catch (e) { }
-      try { root.window = root.window || {}; root.window.location = docForDetect.location; } catch (e) { }
-    } catch (e) { }
+      const sh = createShims(doc, url);
+      sh.installToRoot(root, docForDetect);
+      try { if (module && module.__vmContext) sh.installToVm(module.__vmContext, docForDetect); } catch (e) { }
+    } catch (e) {
+      console.warn('[translatorRunner] failed to install shims for detection', e);
+    }
 
     // Two detection styles supported:
     // - module.detect(doc)          -> for simple module translators
@@ -334,10 +247,6 @@ export async function runTranslatorOnHtml(
             throw new Error("Translator.detectWeb returned false");
           }
         }
-        // if (kind === "multiple")
-        //   throw new Error(
-        //     "Translator returned multiple items; multi-select not supported by runner",
-        //   );
       } catch (e) {
         console.error("[translatorRunner] detectWeb() threw", e);
         throw e;
@@ -372,101 +281,14 @@ export async function runTranslatorOnHtml(
 
     if (typeof module.doWeb === "function") {
       // Provide minimal Zotero/ZU/Z environment so many Zotero translators can run.
-      // Use shared shims to provide a safer and consistent environment.
-
-      const ZU = createZU(doc, { baseUrl: url });
-      const Zotero = createZoteroShim();
-
-      // Install minimal globals expected by many translators. Provide fresh
-      // shims and clear previous state to avoid cross-run contamination.
+      // Use consolidated shims for execution
       const root = typeof window !== "undefined" ? window : globalThis;
-      root.ZU = ZU;
-      root.Zotero = Zotero;
-      root.Z = {
-        debug: () => { },
-        monitorDOMChanges: () => { },
-        getHiddenPref: () => false,
-        selectItems: async (items) => {
-          try {
-            const keys = Object.keys(items || {});
-            if (!keys.length) return null;
-            const k = keys[0];
-            const sel = {};
-            sel[k] = items[k];
-            return sel;
-          } catch (e) { return null; }
-        }
-      };
-      try { root.doc = doc; } catch (e) { }
-      try { root.document = doc; } catch (e) { }
-      try { root.Zotero._lastItem = null; } catch (e) { }
-
-      // small helpers used by many translators
-      root.attr = ((d, selector, name) => {
-        try {
-          const el = (d || doc).querySelector(selector);
-          return el ? el.getAttribute(name) : "";
-        } catch (e) {
-          return "";
-        }
-      });
-      root.text = ((d, selector) => root.ZU.text(d, selector));
-      root.requestText = (async (u, opts) => {
-        const absolute = new URL(u, url || (typeof location !== 'undefined' ? location.href : '')).href;
-        const r = await fetch(absolute, opts);
-        if (!r.ok) throw new Error(`HTTP ${r.status}`);
-        return await r.text();
-      });
-      root.requestDocument = (async (u, opts) => {
-        const txt = await root.requestText(u, opts);
-        return new DOMParser().parseFromString(txt, "text/html");
-      });
-
-      // Ensure ZU.requestDocument resolves relative URLs as well
-      root.ZU.requestDocument = root.requestDocument;
-
-      // Also install shims into the VM context for translators evaluated in
-      // an isolated VM so their globals resolve correctly there.
       try {
-        if (module && module.__vmContext) {
-          const ctx = module.__vmContext;
-          ctx.ZU = ZU;
-          ctx.Zotero = Zotero;
-          ctx.Z = {
-            debug: () => { },
-            monitorDOMChanges: () => { },
-            getHiddenPref: () => false,
-            selectItems: async (items) => {
-              try {
-                const keys = Object.keys(items || {});
-                if (!keys.length) return null;
-                const k = keys[0];
-                const sel = {};
-                sel[k] = items[k];
-                return sel;
-              } catch (e) { return null; }
-            }
-          };
-          ctx.doc = docForDetect;
-          ctx.document = docForDetect;
-          ctx.Zotero && (ctx.Zotero._lastItem = null);
-                      ctx.attr = ((d, selector, name) => {
-              try {
-                const el = (d || doc).querySelector(selector);
-                return el ? el.getAttribute(name) : "";
-              } catch (e) { return ""; }
-            });
-            if (ctx.ZU) { // This should never fail
-              ctx.text = ((d, selector) => ctx.ZU.text(d, selector));
-            }
-          ctx.requestText = root.requestText;
-          ctx.requestDocument = root.requestDocument;
-          // Mirror location into VM context as well
-          try { ctx.location = docForDetect.location; } catch (e) { }
-          try { ctx.window = ctx.window || {}; ctx.window.location = docForDetect.location; } catch (e) { }
-        }
+        const shExec = createShims(doc, url);
+        shExec.installToRoot(root, docForDetect);
+        try { if (module && module.__vmContext) shExec.installToVm(module.__vmContext, docForDetect); } catch (e) {}
       } catch (e) {
-        // continue if decorating VM context fails
+        console.warn('[translatorRunner] failed to create shims for execution', e);
       }
 
       try {
@@ -569,49 +391,49 @@ export async function runTranslatorOnHtml(
         }
       }
 
-      // If the produced item is mostly empty, try to supplement common
-      // metadata from the parsed `doc` (meta tags, citation_* tags, etc.).
-      try {
-        const isMostlyEmpty =
-          (!produced.title || produced.title === '') &&
-          (!produced.creators || produced.creators.length === 0) &&
-          (!produced.DOI || produced.DOI === '');
-        if (isMostlyEmpty && doc) {
-          const meta = (name) => {
-            try {
-              const el = doc.querySelector(`meta[name="${name}"]`);
-              return el ? (el.getAttribute('content') || '').trim() : '';
-            } catch (e) { return ''; }
-          };
+      // // If the produced item is mostly empty, try to supplement common
+      // // metadata from the parsed `doc` (meta tags, citation_* tags, etc.).
+      // try {
+      //   const isMostlyEmpty =
+      //     (!produced.title || produced.title === '') &&
+      //     (!produced.creators || produced.creators.length === 0) &&
+      //     (!produced.DOI || produced.DOI === '');
+      //   if (isMostlyEmpty && doc) {
+      //     const meta = (name) => {
+      //       try {
+      //         const el = doc.querySelector(`meta[name="${name}"]`);
+      //         return el ? (el.getAttribute('content') || '').trim() : '';
+      //       } catch (e) { return ''; }
+      //     };
 
-          if (!produced.title) produced.title = meta('citation_title') || meta('dc.title') || (doc.querySelector('h1') && doc.querySelector('h1').textContent.trim()) || produced.title;
+      //     if (!produced.title) produced.title = meta('citation_title') || meta('dc.title') || (doc.querySelector('h1') && doc.querySelector('h1').textContent.trim()) || produced.title;
 
-          if ((!produced.creators || produced.creators.length === 0)) {
-            const authorMeta = doc.querySelectorAll('meta[name="citation_author"]');
-            if (authorMeta && authorMeta.length) {
-              produced.creators = [...authorMeta].map(a => root.ZU.cleanAuthor(a.getAttribute('content') || '', 'author'));
-            }
-          }
+      //     if ((!produced.creators || produced.creators.length === 0)) {
+      //       const authorMeta = doc.querySelectorAll('meta[name="citation_author"]');
+      //       if (authorMeta && authorMeta.length) {
+      //         produced.creators = [...authorMeta].map(a => root.ZU.cleanAuthor(a.getAttribute('content') || '', 'author'));
+      //       }
+      //     }
 
-          if (!produced.DOI) produced.DOI = meta('citation_doi') || meta('dc.identifier') || produced.DOI;
-          if (!produced.journal) produced.journal = meta('citation_journal_title') || meta('citation_conference_title') || produced.journal;
-          if (!produced.year && meta('citation_publication_date')) {
-            const m = meta('citation_publication_date').match(/(\d{4})/);
-            if (m) produced.year = m[1];
-          }
-          if (!produced.volume) produced.volume = meta('citation_volume') || produced.volume;
-          if (!produced.issue) produced.issue = meta('citation_issue') || produced.issue;
-          if (!produced.pages) {
-            const fp = meta('citation_firstpage');
-            const lp = meta('citation_lastpage');
-            if (fp && lp) produced.pages = `${fp}-${lp}`;
-            else produced.pages = meta('citation_pages') || produced.pages;
-          }
-          if (!produced.abstractNote) produced.abstractNote = meta('citation_abstract') || meta('description') || produced.abstractNote;
-        }
-      } catch (e) {
-        console.warn('[translatorRunner] supplement from doc failed', e);
-      }
+      //     if (!produced.DOI) produced.DOI = meta('citation_doi') || meta('dc.identifier') || produced.DOI;
+      //     if (!produced.journal) produced.journal = meta('citation_journal_title') || meta('citation_conference_title') || produced.journal;
+      //     if (!produced.year && meta('citation_publication_date')) {
+      //       const m = meta('citation_publication_date').match(/(\d{4})/);
+      //       if (m) produced.year = m[1];
+      //     }
+      //     if (!produced.volume) produced.volume = meta('citation_volume') || produced.volume;
+      //     if (!produced.issue) produced.issue = meta('citation_issue') || produced.issue;
+      //     if (!produced.pages) {
+      //       const fp = meta('citation_firstpage');
+      //       const lp = meta('citation_lastpage');
+      //       if (fp && lp) produced.pages = `${fp}-${lp}`;
+      //       else produced.pages = meta('citation_pages') || produced.pages;
+      //     }
+      //     if (!produced.abstractNote) produced.abstractNote = meta('citation_abstract') || meta('description') || produced.abstractNote;
+      //   }
+      // } catch (e) {
+      //   console.warn('[translatorRunner] supplement from doc failed', e);
+      // }
 
       // If the translator returned RIS text placed into title (some import stubs do), detect and return RIS wrapper
       if (produced.title && /^TY\s+-\s+/m.test(produced.title)) {
