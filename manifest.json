@@ -10,7 +10,8 @@
     "open_in_tab": false
   },
   "background": {
-    "page": "background.html"
+    "service_worker": "background.js",
+    "scripts": ["background.js"],
   },
   "action": {
     "default_popup": "popup.html",
