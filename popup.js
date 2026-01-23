@@ -1,27 +1,13 @@
-async function fetchManifest() {
-  try {
-    const manifestUrl = chrome.runtime.getURL("translators/manifest.json");
-    const resp = await fetch(manifestUrl);
-    if (!resp.ok) throw new Error(`Failed to load manifest: ${resp.status} ${resp.statusText}`);
-    return await resp.json();
-  } catch (e) {
-    console.warn("Error fetching manifest directly, trying background fallback", e);
-    return new Promise((resolve, reject) => {
-      chrome.runtime.sendMessage({ type: "getManifest" }, (resp) => {
-        if (chrome.runtime.lastError) {
-          reject(new Error(chrome.runtime.lastError.message));
-        } else if (resp && resp.ok) {
-          resolve(resp.manifest);
-        } else {
-          reject(new Error(resp ? resp.error : "Unknown error fetching manifest via background"));
-        }
-      });
-    });
-  }
+// Provide a minimal compatibility shim: if `browser` is missing, alias it to `chrome`.
+if (typeof browser === "undefined" && typeof chrome !== "undefined") {
+  globalThis.browser = chrome;
 }
 
 async function findMatchesForUrl(url) {
-  const list = await fetchManifest();
+  const manifestUrl = browser.runtime.getURL("translators/manifest.json");
+  const resp = await fetch(manifestUrl);
+  const list = await resp.json();
+
   const matches = [];
   for (const entry of list) {
     const target = (entry && entry.target) || "";
@@ -38,24 +24,21 @@ async function findMatchesForUrl(url) {
 }
 
 function renderResults(url, matches) {
-  const log = document.getElementById("log");
-  const bib = document.getElementById("bibEntry");
-  appendLog(`URL: ${url}`, "info");
+  // Log the URL
+  appendLog(`URL: ${url}`);
   if (!matches || !matches.length) {
-    appendLog("No matching translators found for this URL.", "warning");
-    appendLog("Try searching for the paper on a supported site like Google Scholar, DOI.org, or a publisher's page.", "info");
-    document.getElementById("log-box").open = true;
+    appendLog("No matching translators found.");
     return;
   }
 }
 
 async function ensureOffscreen() {
-  if (!chrome.offscreen) return false;
-  const has = await chrome.offscreen.hasDocument();
+  if (!browser.offscreen) return false;
+  const has = await browser.offscreen.hasDocument();
   if (has) return true;
   try {
-    await chrome.offscreen.createDocument({
-      url: chrome.runtime.getURL("offscreen.html"),
+    await browser.offscreen.createDocument({
+      url: browser.runtime.getURL("offscreen.html"),
       reasons: ["DOM_PARSER"],
       justification: "Run translators offscreen",
     });
@@ -67,43 +50,29 @@ async function ensureOffscreen() {
 }
 
 async function runTranslatorOffscreen(translatorPaths, url) {
-  const ok = await ensureOffscreen();
+  await ensureOffscreen();
   const payload = { type: "runTranslator", translators: translatorPaths, url };
   try {
     appendLog(`Requesting translator run for ${url}`, "info");
-    chrome.runtime.sendMessage(payload, (resp) => {
-      if (chrome.runtime.lastError) {
-        appendLog(
-          `Background sendMessage failed: ${chrome.runtime.lastError.message}`,
-          "error",
-        );
-        return;
-      }
-      if (resp && resp.ok)
-        appendLog("Background acknowledged run request", "info");
-      else
-        appendLog(
-          `Background error: ${resp && resp.error ? resp.error : "unknown"}`,
-          "error",
-        );
-    });
+    const resp = await browser.runtime.sendMessage(payload);
+    if (resp && resp.ok) appendLog("Background acknowledged run request", "info");
+    else appendLog(`Background error: ${resp && resp.error ? resp.error : "unknown"}`, "error");
   } catch (e) {
     console.error("Failed to send runTranslator message", e);
   }
 }
 
 // Listen for offscreen results
-chrome.runtime.onMessage.addListener((msg) => {
+browser.runtime.onMessage.addListener((msg) => {
   if (!msg || msg.type !== "offscreenResult") return;
   const bib = document.getElementById("bibEntry");
   const error = msg.error;
   const result = msg.result;
   if (error) {
-    appendLog(`Error: ${error}`, "error");
-    document.getElementById("log-box").open = true;
+    appendLog(`Error: ${error}`);
     return;
   }
-  appendLog(`Received result for ${msg.url}`, "success");
+  appendLog(`Received result for ${msg.url}`);
   if (bib) {
     if (typeof result === "string") bib.value = result;
     else bib.value = JSON.stringify(result, null, 2);
@@ -112,16 +81,15 @@ chrome.runtime.onMessage.addListener((msg) => {
   } else {
     appendLog(
       typeof result === "string" ? result : JSON.stringify(result, null, 2),
-      "info"
     );
   }
 });
 
-function appendLog(text, level = "info") {
+function appendLog(text) {
   const log = document.getElementById("log");
   if (!log) return;
   const d = document.createElement("div");
-  d.className = `log-line log-${level}`;
+  d.className = "log-line";
   // Convert URLs in the text into clickable links
   // Split the text keeping URLs (captures https?://...)
   const parts = text.split(/(https?:\/\/(docs.jabref.org|github.com)[^\s]+)/);
@@ -140,7 +108,6 @@ function appendLog(text, level = "info") {
   }
   log.appendChild(d);
   log.scrollTop = log.scrollHeight;
-  console.log(`[${level}] ${text}`);
 }
 
 // Update connection status
@@ -152,14 +119,10 @@ function updateStatus(status, className) {
 
 // Connect to JabRef via HTTP POST
 let jabrefBaseUrl = null;
-function getBaseUrl() {
-  return new Promise((resolve) => {
-    chrome.storage.local.get({ jabrefPort: 23119 }, (res) => {
-      const port = res.jabrefPort || 23119;
-      const base = `http://localhost:${port}/`;
-      resolve(base);
-    });
-  });
+async function getBaseUrl() {
+  const res = await browser.storage.local.get({ jabrefPort: 23119 });
+  const port = res.jabrefPort || 23119;
+  return `http://localhost:${port}/`;
 }
 
 async function connectToJabRef() {
@@ -263,18 +226,15 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (noneEl) noneEl.style.display = "block";
     return;
   }
-  try {
-    if (!window.chrome || !chrome.tabs) {
-      urlEl.textContent = "Chrome extension APIs not available.";
-      document.getElementById("none").style.display = "block";
-      return;
-    }
+    try {
+      if (!window.browser || !browser.tabs) {
+        urlEl.textContent = "Extension APIs not available.";
+        document.getElementById("none").style.display = "block";
+        return;
+      }
 
-    const tab = await new Promise((resolve) => {
-      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-        resolve(tabs && tabs[0]);
-      });
-    });
+      const tabs = await browser.tabs.query({ active: true, currentWindow: true });
+      const tab = tabs && tabs[0];
     const url = tab && tab.url ? tab.url : "";
     if (!url) {
       urlEl.textContent = "Unable to determine active tab URL.";
@@ -287,31 +247,23 @@ document.addEventListener("DOMContentLoaded", async () => {
       matches = await findMatchesForUrl(url);
     } catch (e) {
       console.error("Error fetching translators manifest", e);
-      if (urlEl) {
-        urlEl.textContent =
-          "Error reading translators manifest: " +
-          (e && e.message ? e.message : String(e));
-      }
-      const noneEl = document.getElementById("none");
-      if (noneEl) noneEl.style.display = "block";
+      urlEl.textContent =
+        "Error reading translators manifest: " +
+        (e && e.message ? e.message : String(e));
+      document.getElementById("none").style.display = "block";
       return;
     }
 
     renderResults(url, matches || []);
     if (matches && matches.length) {
       // Build array of translator URLs and request background/offscreen
-      const translatorPaths = matches.map((m) =>
-        chrome.runtime.getURL(m.path || ""),
-      );
+      const translatorPaths = matches.map((m) => browser.runtime.getURL(m.path || ""));
       runTranslatorOffscreen(translatorPaths, url);
     }
   } catch (e) {
     console.error("Popup initialization error", e);
-    if (urlEl) {
-      urlEl.textContent =
-        "Popup error: " + (e && e.message ? e.message : String(e));
-    }
-    const noneEl = document.getElementById("none");
-    if (noneEl) noneEl.style.display = "block";
+    urlEl.textContent =
+      "Popup error: " + (e && e.message ? e.message : String(e));
+    document.getElementById("none").style.display = "block";
   }
 });

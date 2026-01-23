@@ -10,8 +10,7 @@
     "open_in_tab": false
   },
   "background": {
-    "service_worker": "background.js",
-    "scripts": ["background.js"]
+    "page": "background.html"
   },
   "action": {
     "default_popup": "popup.html",
@@ -26,6 +25,21 @@
     "48": "JabRef-icon-48.png",
     "128": "JabRef-icon-128.png"
   },
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "background.js",
+        "offscreen.js",
+        "sources/*.js",
+        "sources/vendor/*.js",
+        "translators/*.json",
+        "translators/zotero/*.js"
+      ],
+      "matches": [
+        "<all_urls>"
+      ]
+    }
+  ],
   "browser_specific_settings": {
     "gecko": {
       "id": "browser-extension@jabref",
