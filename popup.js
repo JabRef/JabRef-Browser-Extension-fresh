@@ -24,8 +24,6 @@ async function findMatchesForUrl(url) {
 }
 
 function renderResults(url, matches) {
-  const log = document.getElementById("log");
-  const bib = document.getElementById("bibEntry");
   // Log the URL
   appendLog(`URL: ${url}`);
   if (!matches || !matches.length) {
@@ -52,7 +50,7 @@ async function ensureOffscreen() {
 }
 
 async function runTranslatorOffscreen(translatorPaths, url) {
-  const ok = await ensureOffscreen();
+  await ensureOffscreen();
   const payload = { type: "runTranslator", translators: translatorPaths, url };
   try {
     appendLog(`Requesting translator run for ${url}`, "info");
