@@ -11,7 +11,7 @@
   },
   "background": {
     "service_worker": "background.js",
-    "page": "background.html"
+    "scripts": ["background.js"],
   },
   "action": {
     "default_popup": "popup.html",
