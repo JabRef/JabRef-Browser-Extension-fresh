@@ -3,14 +3,19 @@
   "description": "Tests for JabRef Connector Extension",
   "scripts": {
     "lint": "eslint . --ignore-pattern 'translators/*'",
-    "test": "node test.js arXiv.org.js"
+    "test": "node test.js arXiv.org.js",
+    "bundle-linkedom": "rollup -c"
   },
   "dependencies": {
-    "jsdom": "^27.4.0"
+    "jsdom": "^27.4.0",
+    "linkedom": "^0.18.12"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.2",
+    "@rollup/plugin-commonjs": "^28.0.2",
+    "@rollup/plugin-node-resolve": "^16.0.0",
     "eslint": "^9.39.2",
-    "globals": "^17.0.0"
+    "globals": "^17.0.0",
+    "rollup": "^4.32.0"
   }
 }
