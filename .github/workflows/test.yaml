@@ -22,7 +22,7 @@ jobs:
     - name: Run import_and_patch_translators
       run: python3 scripts/import_and_patch_translators.py
     - name: Install dependencies
-      run: npm install
+      run: npm ci
     - name: Verify linkedom bundle consistency
       run: |
         npm run bundle-linkedom
