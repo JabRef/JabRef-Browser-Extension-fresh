@@ -5,7 +5,7 @@ import { defineConfig } from "eslint/config";
 export default defineConfig([
   {
     files: ["**/*.{js,mjs,cjs}"],
-    ignores: ["translators/zotero/**", "test.js"],
+    ignores: ["translators/zotero/**", "test.js", "sources/vendor/linkedom.js", "dist/**"],
     plugins: { js },
     extends: ["js/recommended"],
     languageOptions: {
