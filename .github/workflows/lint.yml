@@ -24,4 +24,4 @@ jobs:
 
       - run: npm ci
 
-      - run: npx eslint . --ignore-pattern 'translators/*'
+      - run: npm run lint
