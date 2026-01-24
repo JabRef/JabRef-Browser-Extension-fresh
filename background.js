@@ -2,13 +2,18 @@
 import { DOMParser as LinkeDOMParser } from './sources/vendor/linkedom.js';
 import { runTranslatorOnHtml } from './sources/translatorRunner.js';
 
-// Shim DOMParser for Safari and other environments without it in the background
+// Shim DOMParser for environments without it in the background
 if (typeof globalThis.DOMParser === 'undefined') {
   globalThis.DOMParser = LinkeDOMParser;
 }
-if (typeof window !== 'undefined' && typeof window.DOMParser === 'undefined') {
-  window.DOMParser = LinkeDOMParser;
+if (typeof globalThis.window === 'undefined') {
+  globalThis.window = globalThis;
 }
+if (typeof globalThis.window.DOMParser === 'undefined') {
+  globalThis.window.DOMParser = LinkeDOMParser;
+}
+
+console.debug('[background] module loaded');
 
 // Provide a minimal compatibility shim: if `browser` is missing, alias it to `chrome`.
 if (typeof browser === "undefined" && typeof chrome !== "undefined") {
