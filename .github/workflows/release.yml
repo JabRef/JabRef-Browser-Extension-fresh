@@ -122,16 +122,10 @@ jobs:
             SAFARI_DIR="dist/safari"
             APP_NAME="JabRef Browser Extension"
             APP_PATH="$SAFARI_DIR/$APP_NAME/macOS/$APP_NAME.app"
-            IDENTITY=vorstand@jabref.org
-          
             
             echo "Submitting for notarization..."
-            xcrun notarytool submit "$ARCHIVE_PATH" \
-            --apple-id "$APPLE_ID" \
-            --password "$APP_PASSWORD" \
-            --team-id "$TEAM_ID" \
-            --keychain-profile "notarytool-profile"
-            --wait
+            xcrun notarytool store-credentials "notarytool-profile" --apple-id "vorstand@jabref.org" --team-id "6792V39SK3" --password "${{ secrets.OSX_NOTARIZATION_APP_PWD }}"
+            xcrun notarytool submit "$ARCHIVE_PATH" --keychain-profile "notarytool-profile" --wait
             
             echo "Stapling notarization ticket..."
             xcrun stapler staple "$APP_PATH"
