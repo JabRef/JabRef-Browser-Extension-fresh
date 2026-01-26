@@ -52,6 +52,14 @@ You can load it as an unpacked/temporary extension.
 1. Open `about:debugging#/runtime/this-firefox`.
 2. Click **Load Temporary Add-on...** and select the `manifest.json` file from this repository.
 
+#### Safari (macOS and Xcode required)
+
+1. Run `make safari` to build the Safari extension.
+2. Open the generated Xcode project in `dist/safari/JabRef Browser Extension/`.
+3. Click the **Play** button (or press `Cmd+R`) in Xcode to build and run the extension.
+4. Safari will open. You may need to enable the extension in **Safari Settings** > **Extensions**.
+5. Ensure **Allow Unsigned Extensions** is enabled in the **Develop** menu (if you don't see the Develop menu, enable it in Safari Settings > Advanced).
+
 Note: Loading the extension this way is temporary in Firefox and will be removed when the browser restarts. For permanent installation you can pack and sign the extension or install from a browser extension store.
 
 ## Usage
@@ -88,6 +96,7 @@ Note that this browser extension does not make any changes to the Zotero databas
 8. Start browser with the add-on activated:
    Firefox: `npm run dev:firefox`
    Chrome: `npm run dev:opera`
+   Safari: `make safari` (then run the generated Xcode project; **macOS and Xcode required**)
 
 ### Install (Developer)
 
@@ -96,6 +105,8 @@ Note that this browser extension does not make any changes to the Zotero databas
 3. Click **Load unpacked** and select this repository folder.
 
 For Firefox development use `about:debugging#/runtime/this-firefox` and load a temporary add-on.
+
+For Safari development, run `make safari` and open the resulting Xcode project in `dist/safari/` (**macOS and Xcode required**).
 
 ### Project Structure (high level)
 

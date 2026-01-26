@@ -33,3 +33,7 @@ h1 {
 }
 
 .log-line { margin: 6px 0; white-space: pre-wrap }
+.log-info { color: #333; }
+.log-error { color: #d00; font-weight: bold; }
+.log-success { color: #070; }
+.log-warning { color: #850; }

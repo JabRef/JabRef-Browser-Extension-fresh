@@ -1,0 +1,78 @@
+name: Build and Release Browser Extension
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    name: Build Extension
+    runs-on: macos-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.x'
+
+      - name: Run import_and_patch_translators
+        run: python3 scripts/import_and_patch_translators.py
+
+      - name: Run tests
+        run: npm test
+
+      - name: Install web-ext
+        run: npm install -g web-ext
+
+      - name: Build extension
+        run: make all
+
+      - name: Upload Chrome Artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: chrome-extension
+          path: dist/chrome/jabref-browser-extension-chrome.zip
+
+      - name: Upload Firefox Artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: firefox-extension
+          path: dist/firefox/jabref-browser-extension-firefox.xpi
+
+      - name: Upload Safari Artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: safari-extension
+          path: dist/safari/jabref-browser-extension-safari.zip
+
+  release:
+    name: Create GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v7
+        with:
+          path: artifacts
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            artifacts/chrome-extension/jabref-browser-extension-chrome.zip
+            artifacts/firefox-extension/jabref-browser-extension-firefox.xpi
+            artifacts/safari-extension/jabref-browser-extension-safari.zip
+          generate_release_notes: true

@@ -256,8 +256,8 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     renderResults(url, matches || []);
     if (matches && matches.length) {
-      // Build array of translator URLs and request background/offscreen
-      const translatorPaths = matches.map((m) => browser.runtime.getURL(m.path || ""));
+      // Build array of translator paths and request background/offscreen
+      const translatorPaths = matches.map((m) => m.path || "");
       runTranslatorOffscreen(translatorPaths, url);
     }
   } catch (e) {
