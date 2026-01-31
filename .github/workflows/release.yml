@@ -67,19 +67,38 @@ jobs:
           APP_PATH="$SAFARI_DIR/build/Build/Products/Release/$APP_NAME.app"
           echo "Built app path: $APP_PATH"
           
+          if [ ! -d "$APP_PATH" ]; then
+            echo "Error: App bundle not found at $APP_PATH"
+            ls -R "$SAFARI_DIR"
+            exit 1
+          fi
+
           echo "Codesigning Safari extension..."
           
           # Sign the embedded extension first
           EXTENSION_PATH=$(find "$APP_PATH" -name "*.appex")
+          if [ -z "$EXTENSION_PATH" ]; then
+            echo "Error: Extension (.appex) not found in $APP_PATH"
+            ls -R "$APP_PATH"
+            exit 1
+          fi
+          
           echo "Signing extension: $EXTENSION_PATH"
-          codesign --force --options runtime --sign "$IDENTITY" "$EXTENSION_PATH"
+          codesign --force --options runtime --sign "$IDENTITY" --timestamp --verbose=4 "$EXTENSION_PATH" || {
+            echo "Failed to sign extension. Checking security find-identity..."
+            security find-identity -v -p codesigning
+            exit 1
+          }
           
           # Sign the main app
           echo "Signing app: $APP_PATH"
-          codesign --force --options runtime --sign "$IDENTITY" "$APP_PATH"
+          codesign --force --options runtime --sign "$IDENTITY" --timestamp --verbose=4 "$APP_PATH" || {
+            echo "Failed to sign app."
+            exit 1
+          }
           
           echo "Verifying signature..."
-          codesign --verify --verbose "$APP_PATH"
+          codesign --verify --verbose=4 "$APP_PATH"
           
           echo "Done! Signed app is at $APP_PATH"
 

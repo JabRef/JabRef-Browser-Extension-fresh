@@ -51,6 +51,9 @@ safari:
                -scheme "JabRef Browser Extension" \
                -configuration Release \
                -derivedDataPath "$(SAFARI_DIR)/build" \
+               CODE_SIGN_IDENTITY="" \
+               CODE_SIGNING_REQUIRED=NO \
+               CODE_SIGNING_ALLOWED=NO \
                build
 	# Package the .app
 	cp -R "$(SAFARI_DIR)/build/Build/Products/Release/JabRef Browser Extension.app" "$(SAFARI_DIR)/"
