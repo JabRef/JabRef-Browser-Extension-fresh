@@ -59,24 +59,12 @@ jobs:
           
           SAFARI_DIR="dist/safari"
           APP_NAME="JabRef Browser Extension"
-          APP_PATH="$SAFARI_DIR/$APP_NAME/macOS/$APP_NAME.app"
           IDENTITY=vorstand@jabref.org 
-          
-          # Clean up previous build to avoid signing issues
-          rm -rf "$SAFARI_DIR/$APP_NAME"
           
           echo "Building Safari extension..."
           make safari
           
-          echo "Building Safari app with xcodebuild..."
-          xcodebuild -project "$SAFARI_DIR/$APP_NAME/$APP_NAME.xcodeproj" \
-                     -scheme "$APP_NAME" \
-                     -configuration Release \
-                     -derivedDataPath build \
-                     build
-          
-          # Find the built .app
-          APP_PATH=$(find build -name "$APP_NAME.app" -type d | head -n 1)
+          APP_PATH="$SAFARI_DIR/build/Build/Products/Release/$APP_NAME.app"
           echo "Built app path: $APP_PATH"
           
           echo "Codesigning Safari extension..."
@@ -111,10 +99,10 @@ jobs:
         uses: actions/upload-artifact@v6
         with:
           name: safari-signed-app
-          path: build/Build/Products/Release/JabRef Browser Extension.app
+          path: dist/safari/build/Build/Products/Release/JabRef Browser Extension.app
           retention-days: 1
 
-      - name: Upload Safari Artifact (Unsigned)
+      - name: Upload Safari Artifact (App)
         uses: actions/upload-artifact@v6
         with:
           name: safari-extension

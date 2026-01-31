@@ -46,7 +46,15 @@ safari:
 	rm -rf /tmp/jabref-safari-src/dist
 	xcrun safari-web-extension-converter /tmp/jabref-safari-src --project-location $(SAFARI_DIR) --macos-only --no-open --no-prompt --bundle-identifier org.jabref.JabRef-Browser-Extension --force --copy-resources --app-name "JabRef Browser Extension"
 	rm -rf /tmp/jabref-safari-src
-	cd $(SAFARI_DIR) && zip -r jabref-browser-extension-safari.zip "JabRef Browser Extension"
+	# Build the extension to produce the .app
+	xcodebuild -project "$(SAFARI_DIR)/JabRef Browser Extension/JabRef Browser Extension.xcodeproj" \
+               -scheme "JabRef Browser Extension" \
+               -configuration Release \
+               -derivedDataPath "$(SAFARI_DIR)/build" \
+               build
+	# Package the .app
+	cp -R "$(SAFARI_DIR)/build/Build/Products/Release/JabRef Browser Extension.app" "$(SAFARI_DIR)/"
+	cd $(SAFARI_DIR) && zip -r jabref-browser-extension-safari.zip "JabRef Browser Extension.app"
 
 clean:
 	rm -rf $(DIST)
