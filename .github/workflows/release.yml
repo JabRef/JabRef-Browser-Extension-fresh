@@ -59,7 +59,7 @@ jobs:
           
           SAFARI_DIR="dist/safari"
           APP_NAME="JabRef Browser Extension"
-          IDENTITY=vorstand@jabref.org 
+          IDENTITY="Developer ID Application: JabRef e.V. (6792V39SK3)" 
           
           echo "Building Safari extension..."
           make safari
