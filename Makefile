@@ -36,10 +36,16 @@ $(FIREFOX_XPI):
 	rm -f manifest_backup.json
 
 safari:
+	rm -rf $(SAFARI_DIR)
 	mkdir -p $(SAFARI_DIR)
 	# Safari supports background.page with persistent:false in MV3, which is the default in manifest.json
-	xcrun safari-web-extension-converter . --project-location $(SAFARI_DIR) --macos-only --no-open --no-prompt --bundle-identifier org.jabref.JabRef-Browser-Extension --force --copy-resources
-	find "$(SAFARI_DIR)/JabRef Browser Extension" -name "dist" -type d -exec rm -rf {} +
+	# We use a temporary directory outside the project root to avoid recursion of the 'dist' directory during conversion
+	rm -rf /tmp/jabref-safari-src
+	mkdir -p /tmp/jabref-safari-src
+	cp -R . /tmp/jabref-safari-src || true
+	rm -rf /tmp/jabref-safari-src/dist
+	xcrun safari-web-extension-converter /tmp/jabref-safari-src --project-location $(SAFARI_DIR) --macos-only --no-open --no-prompt --bundle-identifier org.jabref.JabRef-Browser-Extension --force --copy-resources --app-name "JabRef Browser Extension"
+	rm -rf /tmp/jabref-safari-src
 	cd $(SAFARI_DIR) && zip -r jabref-browser-extension-safari.zip "JabRef Browser Extension"
 
 clean:

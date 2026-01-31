@@ -68,6 +68,17 @@ jobs:
           echo "Building Safari extension..."
           make safari
           
+          echo "Building Safari app with xcodebuild..."
+          xcodebuild -project "$SAFARI_DIR/$APP_NAME/$APP_NAME.xcodeproj" \
+                     -scheme "$APP_NAME" \
+                     -configuration Release \
+                     -derivedDataPath build \
+                     build
+          
+          # Find the built .app
+          APP_PATH=$(find build -name "$APP_NAME.app" -type d | head -n 1)
+          echo "Built app path: $APP_PATH"
+          
           echo "Codesigning Safari extension..."
           
           # Sign the embedded extension first
@@ -100,7 +111,7 @@ jobs:
         uses: actions/upload-artifact@v6
         with:
           name: safari-signed-app
-          path: dist/safari/JabRef Browser Extension
+          path: build/Build/Products/Release/JabRef Browser Extension.app
           retention-days: 1
 
       - name: Upload Safari Artifact (Unsigned)
@@ -121,13 +132,17 @@ jobs:
         uses: actions/download-artifact@v6
         with:
           name: safari-signed-app
-          path: dist/safari/JabRef Browser Extension
+          path: dist/safari/JabRef Browser Extension.app
 
       - name: Notarize Safari extension
         run: |
           SAFARI_DIR="dist/safari"
           APP_NAME="JabRef Browser Extension"
-          APP_PATH="$SAFARI_DIR/$APP_NAME/macOS/$APP_NAME.app"
+          APP_PATH="$SAFARI_DIR/$APP_NAME.app"
+          ARCHIVE_PATH="$SAFARI_DIR/$APP_NAME.zip"
+          
+          echo "Zipping app for notarization..."
+          cd "$SAFARI_DIR" && zip -r "$APP_NAME.zip" "$APP_NAME.app"
           
           echo "Submitting for notarization..."
           xcrun notarytool store-credentials "notarytool-profile" --apple-id "vorstand@jabref.org" --team-id "6792V39SK3" --password "${{ secrets.OSX_NOTARIZATION_APP_PWD }}"
@@ -137,9 +152,7 @@ jobs:
           xcrun stapler staple "$APP_PATH"
           
           echo "Re-zipping the notarized app for distribution..."
-          # The zip we created for notarization might not be exactly what we want to distribute, 
-          # although it contains the .app. Usually we zip the "JabRef Browser Extension" folder.
-          cd "$SAFARI_DIR" && zip -r jabref-browser-extension-safari.zip "$APP_NAME"
+          cd "$SAFARI_DIR" && zip -r jabref-browser-extension-safari.zip "$APP_NAME.app"
           
           echo "Done! Notarized app is at $APP_PATH and zip is at $SAFARI_DIR/jabref-browser-extension-safari.zip"
 
