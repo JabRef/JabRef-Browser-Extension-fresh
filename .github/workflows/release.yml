@@ -39,7 +39,7 @@ jobs:
       - name: Build extension
         run: make all
 
-      - name: Codesign Safari extension
+      - name: Import keychain certificate
         uses: slidoapp/import-codesign-certs@1923310662e8682dd05b76b612b53301f431cd5d
         with:
           p12-file-base64: ${{ secrets.OSX_SIGNING_CERT_APPLICATION }}
