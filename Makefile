@@ -32,7 +32,7 @@ $(FIREFOX_XPI):
 	# Firefox supports background.page in MV3, but if we want to be safe or specific:
 	# (Actually manifest.json default is already good for Firefox MV3)
 	web-ext build --artifacts-dir $(FIREFOX_DIR) --ignore-files dist/** --ignore-files scripts/** --ignore-files .git/** --ignore-files sources/vendor/linkedom.js --overwrite-dest
-	mv $(FIREFOX_DIR)/jabref-browser-extension-*.zip $(FIREFOX_XPI)
+	mv $(FIREFOX_DIR)/jabref_browser_extension-*.zip $(FIREFOX_XPI)
 	rm -f manifest_backup.json
 
 safari:
