@@ -4,6 +4,7 @@ on:
   push:
     tags:
       - 'v*'
+  workflow_dispatch:
 
 jobs:
   build:
@@ -38,6 +39,46 @@ jobs:
       - name: Build extension
         run: make all
 
+      - name: Codesign Safari extension
+        uses: apple-actions/import-codesign-certs@v3
+        with:
+          p12-file-base64: ${{ secrets.OSX_SIGNING_CERT_APPLICATION }}
+          p12-password: ${{ secrets.OSX_CERT_PWD }}
+          create-keychain: false
+          keychain-password: tEmPoRaRY-PaeSWD
+
+      - name: Sign Safari extension
+        shell: bash
+        run: |
+          set -e
+          
+          SAFARI_DIR="dist/safari"
+          APP_NAME="JabRef Browser Extension"
+          APP_PATH="$SAFARI_DIR/$APP_NAME/macOS/$APP_NAME.app"
+          IDENTITY=vorstand@jabref.org 
+          
+          # Clean up previous build to avoid signing issues
+          rm -rf "$SAFARI_DIR/$APP_NAME"
+          
+          echo "Building Safari extension..."
+          make safari
+          
+          echo "Codesigning Safari extension..."
+          
+          # Sign the embedded extension first
+          EXTENSION_PATH=$(find "$APP_PATH" -name "*.appex")
+          echo "Signing extension: $EXTENSION_PATH"
+          codesign --force --options runtime --sign "$IDENTITY" "$EXTENSION_PATH"
+          
+          # Sign the main app
+          echo "Signing app: $APP_PATH"
+          codesign --force --options runtime --sign "$IDENTITY" "$APP_PATH"
+          
+          echo "Verifying signature..."
+          codesign --verify --verbose "$APP_PATH"
+          
+          echo "Done! Signed app is at $APP_PATH"
+
       - name: Upload Chrome Artifact
         uses: actions/upload-artifact@v6
         with:
@@ -50,29 +91,78 @@ jobs:
           name: firefox-extension
           path: dist/firefox/jabref-browser-extension-firefox.xpi
 
-      - name: Upload Safari Artifact
+      - name: Upload Signed Safari App (Internal)
+        uses: actions/upload-artifact@v6
+        with:
+          name: safari-signed-app
+          path: dist/safari/JabRef Browser Extension
+          retention-days: 1
+
+      - name: Upload Safari Artifact (Unsigned)
         uses: actions/upload-artifact@v6
         with:
           name: safari-extension
           path: dist/safari/jabref-browser-extension-safari.zip
 
-  release:
-    name: Create GitHub Release
-    needs: build
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - name: Download all artifacts
-        uses: actions/download-artifact@v7
-        with:
-          path: artifacts
+    notarize-safari:
+      name: Notarize Safari Extension
+      needs: build
+      runs-on: macos-latest
+      steps:
+        - name: Checkout code
+          uses: actions/checkout@v6
 
-      - name: Create Release
-        uses: softprops/action-gh-release@v2
-        with:
-          files: |
-            artifacts/chrome-extension/jabref-browser-extension-chrome.zip
-            artifacts/firefox-extension/jabref-browser-extension-firefox.xpi
-            artifacts/safari-extension/jabref-browser-extension-safari.zip
-          generate_release_notes: true
+        - name: Download Signed Safari App
+          uses: actions/download-artifact@v6
+          with:
+            name: safari-signed-app
+            path: dist/safari/JabRef Browser Extension
+
+        - name: Notarize Safari extension
+          run: |
+            SAFARI_DIR="dist/safari"
+            APP_NAME="JabRef Browser Extension"
+            APP_PATH="$SAFARI_DIR/$APP_NAME/macOS/$APP_NAME.app"
+            
+            echo "Submitting for notarization..."
+            xcrun notarytool store-credentials "notarytool-profile" --apple-id "vorstand@jabref.org" --team-id "6792V39SK3" --password "${{ secrets.OSX_NOTARIZATION_APP_PWD }}"
+            xcrun notarytool submit "$ARCHIVE_PATH" --keychain-profile "notarytool-profile" --wait
+            
+            echo "Stapling notarization ticket..."
+            xcrun stapler staple "$APP_PATH"
+            
+            echo "Re-zipping the notarized app for distribution..."
+            # The zip we created for notarization might not be exactly what we want to distribute, 
+            # although it contains the .app. Usually we zip the "JabRef Browser Extension" folder.
+            cd "$SAFARI_DIR" && zip -r jabref-browser-extension-safari.zip "$APP_NAME"
+            
+            echo "Done! Notarized app is at $APP_PATH and zip is at $SAFARI_DIR/jabref-browser-extension-safari.zip"
+  
+
+        - name: Upload Safari Artifact
+          uses: actions/upload-artifact@v6
+          with:
+            name: safari-extension
+            path: dist/safari/jabref-browser-extension-safari.zip
+
+    release:
+      name: Create GitHub Release
+      needs: [ build, notarize-safari ]
+      if: always() && (needs.build.result == 'success') && (needs.notarize-safari.result == 'success' || needs.notarize-safari.result == 'skipped')
+      runs-on: ubuntu-latest
+      permissions:
+        contents: write
+      steps:
+        - name: Download all artifacts
+          uses: actions/download-artifact@v7
+          with:
+            path: artifacts
+
+        - name: Create Release
+          uses: softprops/action-gh-release@v2
+          with:
+            files: |
+              artifacts/chrome-extension/jabref-browser-extension-chrome.zip
+              artifacts/firefox-extension/jabref-browser-extension-firefox.xpi
+              artifacts/safari-extension/jabref-browser-extension-safari.zip
+            generate_release_notes: true
