@@ -45,6 +45,21 @@ safari:
 	cp -R . /tmp/jabref-safari-src || true
 	rm -rf /tmp/jabref-safari-src/dist
 	rm -rf /tmp/jabref-safari-src/node_modules
+	rm -rf /tmp/jabref-safari-src/test_cache
+	rm -rf /tmp/jabref-safari-src/test-results
+	rm -f /tmp/jabref-safari-src/test.js
+	rm -f /tmp/jabref-safari-src/test.log
+	rm -f /tmp/jabref-safari-src/eslint.config.mjs
+	rm -f /tmp/jabref-safari-src/rollup.config.js
+	rm -f /tmp/jabref-safari-src/package.json
+	rm -f /tmp/jabref-safari-src/package-lock.json
+	rm -f /tmp/jabref-safari-src/example_bib_page.html
+	rm -f /tmp/jabref-safari-src/sample.bib
+	rm -f /tmp/jabref-safari-src/scripts/sign_safari.sh
+	rm -f /tmp/jabref-safari-src/scripts/notarize_safari.sh
+	rm -f /tmp/jabref-safari-src/scripts/import_and_patch_translators.py
+	find /tmp/jabref-safari-src -name "__pycache__" -type d -exec rm -rf {} +
+	find /tmp/jabref-safari-src -name "*.md" -delete
 	xcrun safari-web-extension-converter /tmp/jabref-safari-src --project-location $(SAFARI_DIR) --macos-only --no-open --no-prompt --bundle-identifier org.jabref.JabRef-Browser-Extension --force --copy-resources --app-name "JabRef Browser Extension"
 	rm -rf /tmp/jabref-safari-src
 	# Build the extension to produce the .app

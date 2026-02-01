@@ -82,6 +82,21 @@ jobs:
           # Clean up unnecessary files that can cause issues with signing and verification
           echo "Cleaning up unnecessary files..."
           find "$APP_PATH" -name ".DS_Store" -delete || true
+          find "$APP_PATH" -name "__pycache__" -type d -exec rm -rf {} + || true
+          find "$APP_PATH" -name "sign_safari.sh" -delete || true
+          find "$APP_PATH" -name "notarize_safari.sh" -delete || true
+          find "$APP_PATH" -name "import_and_patch_translators.py" -delete || true
+          find "$APP_PATH" -name "test_cache" -type d -exec rm -rf {} + || true
+          find "$APP_PATH" -name "test-results" -type d -exec rm -rf {} + || true
+          find "$APP_PATH" -name "test.js" -delete || true
+          find "$APP_PATH" -name "test.log" -delete || true
+          find "$APP_PATH" -name "eslint.config.mjs" -delete || true
+          find "$APP_PATH" -name "rollup.config.js" -delete || true
+          find "$APP_PATH" -name "package.json" -delete || true
+          find "$APP_PATH" -name "package-lock.json" -delete || true
+          find "$APP_PATH" -name "example_bib_page.html" -delete || true
+          find "$APP_PATH" -name "sample.bib" -delete || true
+          find "$APP_PATH" -name "*.md" -delete || true
           
           # Sign all native binaries (if any)
           echo "Signing all native binaries..."
@@ -170,6 +185,21 @@ jobs:
           # Clean up any leftover files if they reappeared
           APP_PATH="dist/safari/JabRef Browser Extension.app"
           find "$APP_PATH" -name ".DS_Store" -delete || true
+          find "$APP_PATH" -name "__pycache__" -type d -exec rm -rf {} + || true
+          find "$APP_PATH" -name "sign_safari.sh" -delete || true
+          find "$APP_PATH" -name "notarize_safari.sh" -delete || true
+          find "$APP_PATH" -name "import_and_patch_translators.py" -delete || true
+          find "$APP_PATH" -name "test_cache" -type d -exec rm -rf {} + || true
+          find "$APP_PATH" -name "test-results" -type d -exec rm -rf {} + || true
+          find "$APP_PATH" -name "test.js" -delete || true
+          find "$APP_PATH" -name "test.log" -delete || true
+          find "$APP_PATH" -name "eslint.config.mjs" -delete || true
+          find "$APP_PATH" -name "rollup.config.js" -delete || true
+          find "$APP_PATH" -name "package.json" -delete || true
+          find "$APP_PATH" -name "package-lock.json" -delete || true
+          find "$APP_PATH" -name "example_bib_page.html" -delete || true
+          find "$APP_PATH" -name "sample.bib" -delete || true
+          find "$APP_PATH" -name "*.md" -delete || true
           
           ls -R dist/safari
           
