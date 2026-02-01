@@ -138,23 +138,19 @@ jobs:
 
       - name: Notarize Safari extension
         run: |
-          SAFARI_DIR="dist/safari"
-          APP_NAME="JabRef Browser Extension"
-          # The artifact is uploaded as the .app directory itself.
-          # download-artifact@v6 (v4) with path "dist/safari/JabRef Browser Extension.app" 
-          # might put the contents directly there, so "dist/safari/JabRef Browser Extension.app" IS the bundle.
-          APP_PATH="$SAFARI_DIR/$APP_NAME.app"
-          ARCHIVE_PATH="$SAFARI_DIR/$APP_NAME.zip"
+          # download-artifact@v6 with path "dist/safari/JabRef Browser Extension.app"
+          # will place the contents of the .app (Contents/) directly into that directory.
+          # So dist/safari/JabRef Browser Extension.app IS the bundle.
           
-          echo "Checking app structure at $APP_PATH..."
-          ls -R "$APP_PATH" || echo "App not found at $APP_PATH"
-          
-          echo "Checking SAFARI_DIR contents..."
-          ls -R "$SAFARI_DIR"
+          echo "Checking app structure..."
+          ls -R dist/safari
           
           echo "Zipping app for notarization..."
-          # We need to be careful with the zip structure. notarytool wants a zip containing the .app
-          cd "$SAFARI_DIR" && zip -r "$APP_NAME.zip" "$APP_NAME.app"
+          # Go to the directory containing the .app and zip it
+          (cd dist/safari && zip -r "JabRef Browser Extension.zip" "JabRef Browser Extension.app")
+          
+          APP_PATH="dist/safari/JabRef Browser Extension.app"
+          ARCHIVE_PATH="dist/safari/JabRef Browser Extension.zip"
           
           if [ ! -f "$ARCHIVE_PATH" ]; then
             echo "Error: Zip archive not created at $ARCHIVE_PATH"
@@ -170,9 +166,9 @@ jobs:
           
           echo "Re-zipping the notarized app for distribution..."
           # Ensure the final zip for the user has the correct name
-          cd "$SAFARI_DIR" && zip -r jabref-browser-extension-safari.zip "$APP_NAME.app"
+          (cd dist/safari && zip -r jabref-browser-extension-safari.zip "JabRef Browser Extension.app")
           
-          echo "Done! Notarized app is at $APP_PATH and zip is at $SAFARI_DIR/jabref-browser-extension-safari.zip"
+          echo "Done! Notarized app is at $APP_PATH and zip is at dist/safari/jabref-browser-extension-safari.zip"
 
 
       - name: Upload Safari Artifact
