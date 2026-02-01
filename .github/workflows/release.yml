@@ -93,6 +93,12 @@ jobs:
           find "$APP_PATH" -name ".editorconfig" -delete || true
           find "$APP_PATH" -name ".nycrc" -delete || true
           find "$APP_PATH" -name ".npmignore" -delete || true
+          find "$APP_PATH" -name ".jshintrc" -delete || true
+          find "$APP_PATH" -name ".tonic_example.js" -delete || true
+          find "$APP_PATH" -name ".package-lock.json" -delete || true
+          find "$APP_PATH" -name ".gitkeep" -delete || true
+          # Remove .bin directory in node_modules as it contains problematic symlinks
+          find "$APP_PATH" -name ".bin" -type d -exec rm -rf {} + || true
 
           # Sign all native binaries (including those in node_modules)
           echo "Signing all native binaries..."
@@ -106,8 +112,10 @@ jobs:
             # We sign the extension executable specifically too just to be sure
             EXTENSION_EXE=$(find "$EXTENSION_PATH" -path "*/Contents/MacOS/*" -type f)
             if [ -n "$EXTENSION_EXE" ]; then
+                echo "Signing extension executable: $EXTENSION_EXE"
                 codesign --force --options runtime --sign "$IDENTITY" --timestamp --verbose=4 "$EXTENSION_EXE"
             fi
+            echo "Signing extension bundle: $EXTENSION_PATH"
             codesign --force --options runtime --sign "$IDENTITY" --timestamp --verbose=4 "$EXTENSION_PATH"
           fi
 
@@ -179,6 +187,21 @@ jobs:
           # Clean up any leftover files if they reappeared
           APP_PATH="dist/safari/JabRef Browser Extension.app"
           find "$APP_PATH" -name ".DS_Store" -delete || true
+          find "$APP_PATH" -name ".git" -type d -exec rm -rf {} + || true
+          find "$APP_PATH" -name ".github" -type d -exec rm -rf {} + || true
+          find "$APP_PATH" -name "*.md" -delete || true
+          find "$APP_PATH" -name "*.map" -delete || true
+          find "$APP_PATH" -name ".eslintrc*" -delete || true
+          find "$APP_PATH" -name ".babelrc*" -delete || true
+          find "$APP_PATH" -name ".travis.yml" -delete || true
+          find "$APP_PATH" -name ".editorconfig" -delete || true
+          find "$APP_PATH" -name ".nycrc" -delete || true
+          find "$APP_PATH" -name ".npmignore" -delete || true
+          find "$APP_PATH" -name ".jshintrc" -delete || true
+          find "$APP_PATH" -name ".tonic_example.js" -delete || true
+          find "$APP_PATH" -name ".package-lock.json" -delete || true
+          find "$APP_PATH" -name ".gitkeep" -delete || true
+          find "$APP_PATH" -name ".bin" -type d -exec rm -rf {} + || true
           
           ls -R dist/safari
           
