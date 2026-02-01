@@ -61,11 +61,10 @@ jobs:
           APP_NAME="JabRef Browser Extension"
           IDENTITY="Developer ID Application: JabRef e.V. (6792V39SK3)" 
           
-          echo "Building Safari extension..."
-          make safari
-          
-          APP_PATH="$SAFARI_DIR/build/Build/Products/Release/$APP_NAME.app"
-          echo "Built app path: $APP_PATH"
+          # The app is already built by 'make all' in the previous step
+          # and it is located at $SAFARI_DIR/$APP_NAME.app as per Makefile
+          APP_PATH="$SAFARI_DIR/$APP_NAME.app"
+          echo "App path: $APP_PATH"
           
           if [ ! -d "$APP_PATH" ]; then
             echo "Error: App bundle not found at $APP_PATH"
@@ -110,7 +109,7 @@ jobs:
         uses: actions/upload-artifact@v6
         with:
           name: safari-signed-app
-          path: dist/safari/build/Build/Products/Release/
+          path: dist/safari/JabRef Browser Extension.app
           retention-days: 1
 
 
@@ -126,7 +125,7 @@ jobs:
         uses: actions/download-artifact@v6
         with:
           name: safari-signed-app
-          path: dist/safari/
+          path: dist/safari/JabRef Browser Extension.app
 
 
       - name: Notarize Safari extension

@@ -57,7 +57,6 @@ safari:
                build
 	# Package the .app
 	cp -R "$(SAFARI_DIR)/build/Build/Products/Release/JabRef Browser Extension.app" "$(SAFARI_DIR)/"
-	cd $(SAFARI_DIR) && zip -r jabref-browser-extension-safari.zip "JabRef Browser Extension.app"
 
 clean:
 	rm -rf $(DIST)
