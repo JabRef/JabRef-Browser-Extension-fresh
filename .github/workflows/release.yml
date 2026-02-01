@@ -257,7 +257,7 @@ jobs:
   release:
     name: Create GitHub Release
     needs: [ build, notarize-safari ]
-    if: always() && (needs.build.result == 'success') && (needs.notarize-safari.result == 'success' || needs.notarize-safari.result == 'skipped')
+    if: github.event_name != 'workflow_dispatch' && always() && (needs.build.result == 'success') && (needs.notarize-safari.result == 'success' || needs.notarize-safari.result == 'skipped')
     runs-on: ubuntu-latest
     permissions:
       contents: write
