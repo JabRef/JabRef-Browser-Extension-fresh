@@ -105,7 +105,7 @@ jobs:
           }
           
           echo "Verifying signature..."
-          codesign --verify --verbose=4 "$APP_PATH"
+          codesign -vvv --deep --strict "$APP_PATH"
           
           echo "Done! Signed app is at $APP_PATH"
 
@@ -149,12 +149,14 @@ jobs:
           echo "Checking app structure..."
           ls -R dist/safari
           
-          echo "Zipping app for notarization..."
-          # Go to the directory containing the .app and zip it
-          (cd dist/safari && zip -r "JabRef Browser Extension.zip" "JabRef Browser Extension.app")
-          
           APP_PATH="dist/safari/JabRef Browser Extension.app"
           ARCHIVE_PATH="dist/safari/JabRef Browser Extension.zip"
+
+          echo "Verifying signature before zipping..."
+          codesign -vvv --deep --strict "$APP_PATH"
+
+          echo "Zipping app for notarization using ditto..."
+          ditto -c -k --keepParent "$APP_PATH" "$ARCHIVE_PATH"
           
           if [ ! -f "$ARCHIVE_PATH" ]; then
             echo "Error: Zip archive not created at $ARCHIVE_PATH"
@@ -168,11 +170,12 @@ jobs:
           echo "Stapling notarization ticket..."
           xcrun stapler staple "$APP_PATH"
           
-          echo "Re-zipping the notarized app for distribution..."
+          echo "Re-zipping the notarized app for distribution using ditto..."
           # Ensure the final zip for the user has the correct name
-          (cd dist/safari && zip -r jabref-browser-extension-safari.zip "JabRef Browser Extension.app")
+          FINAL_ZIP="dist/safari/jabref-browser-extension-safari.zip"
+          ditto -c -k --keepParent "$APP_PATH" "$FINAL_ZIP"
           
-          echo "Done! Notarized app is at $APP_PATH and zip is at dist/safari/jabref-browser-extension-safari.zip"
+          echo "Done! Notarized app is at $APP_PATH and zip is at $FINAL_ZIP"
 
 
       - name: Upload Safari Artifact
