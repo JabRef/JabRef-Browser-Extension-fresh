@@ -234,3 +234,6 @@ dist
 # Temporary files
 dist/
 test_cache/
+test_results/
+*.log
+build/
