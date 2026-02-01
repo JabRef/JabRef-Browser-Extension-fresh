@@ -58,6 +58,7 @@ safari:
 	rm -f /tmp/jabref-safari-src/scripts/sign_safari.sh
 	rm -f /tmp/jabref-safari-src/scripts/notarize_safari.sh
 	rm -f /tmp/jabref-safari-src/scripts/import_and_patch_translators.py
+	rm -f /tmp/jabref-safari-src/scripts/*.entitlements
 	find /tmp/jabref-safari-src -name "__pycache__" -type d -exec rm -rf {} +
 	find /tmp/jabref-safari-src -name "*.md" -delete
 	xcrun safari-web-extension-converter /tmp/jabref-safari-src --project-location $(SAFARI_DIR) --macos-only --no-open --no-prompt --bundle-identifier org.jabref.JabRef-Browser-Extension --force --copy-resources --app-name "JabRef Browser Extension"

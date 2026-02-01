@@ -86,6 +86,7 @@ jobs:
           find "$APP_PATH" -name "sign_safari.sh" -delete || true
           find "$APP_PATH" -name "notarize_safari.sh" -delete || true
           find "$APP_PATH" -name "import_and_patch_translators.py" -delete || true
+          find "$APP_PATH" -name "*.entitlements" -delete || true
           find "$APP_PATH" -name "test_cache" -type d -exec rm -rf {} + || true
           find "$APP_PATH" -name "test-results" -type d -exec rm -rf {} + || true
           find "$APP_PATH" -name "test.js" -delete || true
@@ -111,22 +112,22 @@ jobs:
             EXTENSION_EXE=$(find "$EXTENSION_PATH" -path "*/Contents/MacOS/*" -type f)
             if [ -n "$EXTENSION_EXE" ]; then
                 echo "Signing extension executable: $EXTENSION_EXE"
-                codesign --force --options runtime --sign "$IDENTITY" --timestamp --verbose=4 "$EXTENSION_EXE"
+                codesign --force --options runtime --entitlements "scripts/JabRef Browser Extension Extension.entitlements" --sign "$IDENTITY" --timestamp --verbose=4 "$EXTENSION_EXE"
             fi
             echo "Signing extension bundle: $EXTENSION_PATH"
-            codesign --force --options runtime --sign "$IDENTITY" --timestamp --verbose=4 "$EXTENSION_PATH"
+            codesign --force --options runtime --entitlements "scripts/JabRef Browser Extension Extension.entitlements" --sign "$IDENTITY" --timestamp --verbose=4 "$EXTENSION_PATH"
           fi
 
           # Sign the main app executable specifically
           echo "Signing main app executable..."
           MAIN_EXE="$APP_PATH/Contents/MacOS/$APP_NAME"
           if [ -f "$MAIN_EXE" ]; then
-            codesign --force --options runtime --sign "$IDENTITY" --timestamp --verbose=4 "$MAIN_EXE"
+            codesign --force --options runtime --entitlements "scripts/JabRef Browser Extension.entitlements" --sign "$IDENTITY" --timestamp --verbose=4 "$MAIN_EXE"
           fi
 
           # Sign the main app
           echo "Signing app: $APP_PATH"
-          codesign --force --options runtime --sign "$IDENTITY" --timestamp --verbose=4 "$APP_PATH" || {
+          codesign --force --options runtime --entitlements "scripts/JabRef Browser Extension.entitlements" --sign "$IDENTITY" --timestamp --verbose=4 "$APP_PATH" || {
             echo "Failed to sign app."
             exit 1
           }
@@ -189,6 +190,7 @@ jobs:
           find "$APP_PATH" -name "sign_safari.sh" -delete || true
           find "$APP_PATH" -name "notarize_safari.sh" -delete || true
           find "$APP_PATH" -name "import_and_patch_translators.py" -delete || true
+          find "$APP_PATH" -name "*.entitlements" -delete || true
           find "$APP_PATH" -name "test_cache" -type d -exec rm -rf {} + || true
           find "$APP_PATH" -name "test-results" -type d -exec rm -rf {} + || true
           find "$APP_PATH" -name "test.js" -delete || true
