@@ -242,6 +242,12 @@ jobs:
           echo "Done! Notarized app is at $APP_PATH and zip is at $FINAL_ZIP"
 
 
+      - name: Upload Final Notarized Safari App
+        uses: actions/upload-artifact@v6
+        with:
+          name: safari-notarized-app
+          path: dist/safari/JabRef Browser Extension.app
+
       - name: Upload Safari Artifact
         uses: actions/upload-artifact@v6
         with:
