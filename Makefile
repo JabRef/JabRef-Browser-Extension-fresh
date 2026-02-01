@@ -44,6 +44,7 @@ safari:
 	mkdir -p /tmp/jabref-safari-src
 	cp -R . /tmp/jabref-safari-src || true
 	rm -rf /tmp/jabref-safari-src/dist
+	rm -rf /tmp/jabref-safari-src/node_modules
 	xcrun safari-web-extension-converter /tmp/jabref-safari-src --project-location $(SAFARI_DIR) --macos-only --no-open --no-prompt --bundle-identifier org.jabref.JabRef-Browser-Extension --force --copy-resources --app-name "JabRef Browser Extension"
 	rm -rf /tmp/jabref-safari-src
 	# Build the extension to produce the .app
