@@ -121,11 +121,6 @@ jobs:
           path: dist/safari/build/Build/Products/Release/JabRef Browser Extension.app
           retention-days: 1
 
-      - name: Upload Safari Artifact (App)
-        uses: actions/upload-artifact@v6
-        with:
-          name: safari-extension
-          path: dist/safari/jabref-browser-extension-safari.zip
 
   notarize-safari:
     name: Notarize Safari Extension
@@ -145,11 +140,26 @@ jobs:
         run: |
           SAFARI_DIR="dist/safari"
           APP_NAME="JabRef Browser Extension"
+          # The artifact is uploaded as the .app directory itself.
+          # download-artifact@v6 (v4) with path "dist/safari/JabRef Browser Extension.app" 
+          # might put the contents directly there, so "dist/safari/JabRef Browser Extension.app" IS the bundle.
           APP_PATH="$SAFARI_DIR/$APP_NAME.app"
           ARCHIVE_PATH="$SAFARI_DIR/$APP_NAME.zip"
           
+          echo "Checking app structure at $APP_PATH..."
+          ls -R "$APP_PATH" || echo "App not found at $APP_PATH"
+          
+          echo "Checking SAFARI_DIR contents..."
+          ls -R "$SAFARI_DIR"
+          
           echo "Zipping app for notarization..."
+          # We need to be careful with the zip structure. notarytool wants a zip containing the .app
           cd "$SAFARI_DIR" && zip -r "$APP_NAME.zip" "$APP_NAME.app"
+          
+          if [ ! -f "$ARCHIVE_PATH" ]; then
+            echo "Error: Zip archive not created at $ARCHIVE_PATH"
+            exit 1
+          fi
           
           echo "Submitting for notarization..."
           xcrun notarytool store-credentials "notarytool-profile" --apple-id "vorstand@jabref.org" --team-id "6792V39SK3" --password "${{ secrets.OSX_NOTARIZATION_APP_PWD }}"
@@ -159,6 +169,7 @@ jobs:
           xcrun stapler staple "$APP_PATH"
           
           echo "Re-zipping the notarized app for distribution..."
+          # Ensure the final zip for the user has the correct name
           cd "$SAFARI_DIR" && zip -r jabref-browser-extension-safari.zip "$APP_NAME.app"
           
           echo "Done! Notarized app is at $APP_PATH and zip is at $SAFARI_DIR/jabref-browser-extension-safari.zip"
