@@ -75,19 +75,7 @@ jobs:
 
           echo "Codesigning Safari extension..."
           
-          # Find and sign all nested binaries in the app (including those in the extension)
-          echo "Signing all nested binaries..."
-          # First, sign dylibs and other libraries
-          find "$APP_PATH" -type f \( -name "*.node" -o -name "*.dylib" -o -name "*.so" \) -print0 | xargs -0 -I {} codesign --force --options runtime --sign "$IDENTITY" --timestamp --verbose=4 {} || true
-          
-          # Then sign the executables
-          find "$APP_PATH" -type f -perm +111 -not -name "*.node" -not -name "*.dylib" -not -name "*.so" -not -path "*/Contents/MacOS/*" -print0 | xargs -0 -I {} codesign --force --options runtime --sign "$IDENTITY" --timestamp --verbose=4 {} || true
-
-          # Sign the main executables explicitly
-          echo "Signing main executables..."
-          find "$APP_PATH" -path "*/Contents/MacOS/*" -type f -print0 | xargs -0 -I {} codesign --force --options runtime --sign "$IDENTITY" --timestamp --verbose=4 {} || true
-
-          # Sign the extension bundle specifically if it exists
+          # Sign the extension bundle specifically if it exists (Inside-out approach)
           EXTENSION_PATH=$(find "$APP_PATH" -name "*.appex")
           if [ -n "$EXTENSION_PATH" ]; then
             echo "Signing extension bundle: $EXTENSION_PATH"
@@ -96,7 +84,7 @@ jobs:
 
           # Sign the main app
           echo "Signing app: $APP_PATH"
-          codesign --force --options runtime --sign "$IDENTITY" --timestamp --verbose=4 "$APP_PATH" || {
+          codesign --force --options runtime --sign "$IDENTITY" --timestamp --verbose=4 --deep "$APP_PATH" || {
             echo "Failed to sign app."
             exit 1
           }
