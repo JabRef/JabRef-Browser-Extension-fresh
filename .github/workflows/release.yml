@@ -67,6 +67,7 @@ jobs:
           echo "App path: $APP_PATH"
           
           # Debug: list the directory to see where the app actually is
+          echo "Listing directory..."
           ls -la "$SAFARI_DIR"
           
           if [ ! -d "$APP_PATH" ]; then
