@@ -141,7 +141,8 @@ jobs:
         uses: actions/download-artifact@v6
         with:
           name: safari-signed-app
-          path: dist/safari/
+          path: dist/safari/JabRef Browser Extension.app
+
 
       - name: Notarize Safari extension
         run: |
