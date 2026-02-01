@@ -83,6 +83,7 @@ jobs:
           echo "Cleaning up unnecessary files..."
           find "$APP_PATH" -name ".DS_Store" -delete || true
           find "$APP_PATH" -name "__pycache__" -type d -exec rm -rf {} + || true
+          find "$APP_PATH" -name "build" -type d -exec rm -rf {} + || true
           find "$APP_PATH" -name "sign_safari.sh" -delete || true
           find "$APP_PATH" -name "notarize_safari.sh" -delete || true
           find "$APP_PATH" -name "import_and_patch_translators.py" -delete || true
@@ -187,6 +188,7 @@ jobs:
           APP_PATH="dist/safari/JabRef Browser Extension.app"
           find "$APP_PATH" -name ".DS_Store" -delete || true
           find "$APP_PATH" -name "__pycache__" -type d -exec rm -rf {} + || true
+          find "$APP_PATH" -name "build" -type d -exec rm -rf {} + || true
           find "$APP_PATH" -name "sign_safari.sh" -delete || true
           find "$APP_PATH" -name "notarize_safari.sh" -delete || true
           find "$APP_PATH" -name "import_and_patch_translators.py" -delete || true

@@ -6,7 +6,7 @@ CHROME_ZIP := $(CHROME_DIR)/jabref-browser-extension-chrome.zip
 FIREFOX_XPI := $(FIREFOX_DIR)/jabref-browser-extension-firefox.xpi
 SAFARI_XCODE := $(SAFARI_DIR)/JabRef\ Browser\ Extension
 
-.PHONY: all chrome firefox safari clean
+.PHONY: all chrome firefox safari clean sign-safari-local notarize-safari-local
 
 all: chrome firefox safari
 
@@ -57,10 +57,13 @@ safari:
 	rm -f /tmp/jabref-safari-src/sample.bib
 	rm -f /tmp/jabref-safari-src/scripts/sign_safari.sh
 	rm -f /tmp/jabref-safari-src/scripts/notarize_safari.sh
+	rm -f /tmp/jabref-safari-src/scripts/sign_safari_local.sh
+	rm -f /tmp/jabref-safari-src/scripts/notarize_safari_local.sh
 	rm -f /tmp/jabref-safari-src/scripts/import_and_patch_translators.py
 	rm -f /tmp/jabref-safari-src/scripts/*.entitlements
 	find /tmp/jabref-safari-src -name "__pycache__" -type d -exec rm -rf {} +
 	find /tmp/jabref-safari-src -name "*.md" -delete
+	rm -rf /tmp/jabref-safari-src/build
 	xcrun safari-web-extension-converter /tmp/jabref-safari-src --project-location $(SAFARI_DIR) --macos-only --no-open --no-prompt --bundle-identifier org.jabref.JabRef-Browser-Extension --force --copy-resources --app-name "JabRef Browser Extension"
 	rm -rf /tmp/jabref-safari-src
 	# Build the extension to produce the .app
@@ -74,6 +77,14 @@ safari:
                build
 	# Package the .app
 	cp -R "$(SAFARI_DIR)/build/Build/Products/Release/JabRef Browser Extension.app" "$(SAFARI_DIR)/"
+
+sign-safari-local:
+	chmod +x scripts/sign_safari_local.sh
+	./scripts/sign_safari_local.sh "$(IDENTITY)"
+
+notarize-safari-local:
+	chmod +x scripts/notarize_safari_local.sh
+	./scripts/notarize_safari_local.sh "$(PROFILE)"
 
 clean:
 	rm -rf $(DIST)

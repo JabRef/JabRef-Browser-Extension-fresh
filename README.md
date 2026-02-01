@@ -108,6 +108,18 @@ For Firefox development use `about:debugging#/runtime/this-firefox` and load a t
 
 For Safari development, run `make safari` and open the resulting Xcode project in `dist/safari/` (**macOS and Xcode required**).
 
+#### Local Signing and Notarization (Safari)
+
+If you have a Developer ID certificate and want to sign and notarize the Safari extension locally:
+
+1. Build the extension: `make safari`
+2. Sign the app: `make sign-safari-local IDENTITY="Developer ID Application: Your Name (ID)"`
+3. Notarize the app:
+   - First, create a notarytool profile: `xcrun notarytool store-credentials "profile-name" --apple-id "your@apple.id" --team-id "TEAMID" --password "app-specific-password"`
+   - Then run: `make notarize-safari-local PROFILE="profile-name"`
+
+The final notarized and zipped extension will be at `dist/safari/jabref-browser-extension-safari.zip`.
+
 ### Project Structure (high level)
 
 ```text
