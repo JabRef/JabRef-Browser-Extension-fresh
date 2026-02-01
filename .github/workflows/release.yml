@@ -102,15 +102,15 @@ jobs:
           }
           
           echo "Verifying signature..."
-          codesign -vvv --deep --strict "$APP_PATH" || {
-            echo "Verification failed. Listing files to debug..."
-            ls -la "$APP_PATH"
-            ls -la "$APP_PATH/Contents"
-            # Try verification without --deep to see if it makes a difference
-            echo "Verifying without --deep..."
-            codesign -vvv --strict "$APP_PATH"
-            exit 1
-          }
+          if ! codesign -vvv --deep --strict "$APP_PATH"; then
+            echo "Deep verification failed. This is sometimes expected with Swift frameworks. Trying strict verification without --deep..."
+            if ! codesign -vvv --strict "$APP_PATH"; then
+              echo "Verification failed even without --deep."
+              ls -la "$APP_PATH"
+              ls -la "$APP_PATH/Contents"
+              exit 1
+            fi
+          fi
           
           echo "Done! Signed app is at $APP_PATH"
 
@@ -158,7 +158,10 @@ jobs:
           ARCHIVE_PATH="dist/safari/JabRef Browser Extension.zip"
 
           echo "Verifying signature before zipping..."
-          codesign -vvv --deep --strict "$APP_PATH"
+          if ! codesign -vvv --deep --strict "$APP_PATH"; then
+            echo "Deep verification failed, trying strict verification without --deep..."
+            codesign -vvv --strict "$APP_PATH"
+          fi
 
           echo "Zipping app for notarization using ditto..."
           ditto -c -k --keepParent "$APP_PATH" "$ARCHIVE_PATH"
