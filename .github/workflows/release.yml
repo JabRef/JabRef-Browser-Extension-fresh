@@ -79,19 +79,43 @@ jobs:
 
           echo "Codesigning Safari extension..."
           
-          # Sign the frameworks first
-          echo "Signing frameworks..."
-          if [ -d "$APP_PATH/Contents/Frameworks" ]; then
-            find "$APP_PATH/Contents/Frameworks" -name "*.dylib" -exec codesign --force --options runtime --sign "$IDENTITY" --timestamp --verbose=4 {} \;
-          else
-            echo "No Frameworks directory found."
-          fi
+          # Clean up unnecessary files that can cause issues with signing and verification
+          echo "Cleaning up unnecessary files..."
+          find "$APP_PATH" -name ".DS_Store" -delete || true
+          find "$APP_PATH" -name ".git" -type d -exec rm -rf {} + || true
+          find "$APP_PATH" -name ".github" -type d -exec rm -rf {} + || true
+          # Remove other non-essential files from node_modules that were causing "file missing" errors
+          find "$APP_PATH" -name "*.md" -delete || true
+          find "$APP_PATH" -name "*.map" -delete || true
+          find "$APP_PATH" -name ".eslintrc*" -delete || true
+          find "$APP_PATH" -name ".babelrc*" -delete || true
+          find "$APP_PATH" -name ".travis.yml" -delete || true
+          find "$APP_PATH" -name ".editorconfig" -delete || true
+          find "$APP_PATH" -name ".nycrc" -delete || true
+          find "$APP_PATH" -name ".npmignore" -delete || true
+
+          # Sign all native binaries (including those in node_modules)
+          echo "Signing all native binaries..."
+          # Find and sign all Mach-O files (dylibs, .node modules, etc.)
+          find "$APP_PATH" -type f \( -name "*.dylib" -o -name "*.node" -o -name "*.so" \) -exec codesign --force --options runtime --sign "$IDENTITY" --timestamp --verbose=4 {} \;
 
           # Sign the extension bundle specifically if it exists (Inside-out approach)
           EXTENSION_PATH=$(find "$APP_PATH" -name "*.appex")
           if [ -n "$EXTENSION_PATH" ]; then
             echo "Signing extension bundle: $EXTENSION_PATH"
+            # We sign the extension executable specifically too just to be sure
+            EXTENSION_EXE=$(find "$EXTENSION_PATH" -path "*/Contents/MacOS/*" -type f)
+            if [ -n "$EXTENSION_EXE" ]; then
+                codesign --force --options runtime --sign "$IDENTITY" --timestamp --verbose=4 "$EXTENSION_EXE"
+            fi
             codesign --force --options runtime --sign "$IDENTITY" --timestamp --verbose=4 "$EXTENSION_PATH"
+          fi
+
+          # Sign the main app executable specifically
+          echo "Signing main app executable..."
+          MAIN_EXE="$APP_PATH/Contents/MacOS/$APP_NAME"
+          if [ -f "$MAIN_EXE" ]; then
+            codesign --force --options runtime --sign "$IDENTITY" --timestamp --verbose=4 "$MAIN_EXE"
           fi
 
           # Sign the main app
@@ -152,9 +176,12 @@ jobs:
       - name: Notarize Safari extension
         run: |
           echo "Checking app structure..."
+          # Clean up any leftover files if they reappeared
+          APP_PATH="dist/safari/JabRef Browser Extension.app"
+          find "$APP_PATH" -name ".DS_Store" -delete || true
+          
           ls -R dist/safari
           
-          APP_PATH="dist/safari/JabRef Browser Extension.app"
           ARCHIVE_PATH="dist/safari/JabRef Browser Extension.zip"
 
           echo "Verifying signature before zipping..."
