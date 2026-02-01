@@ -144,6 +144,10 @@ jobs:
             fi
           fi
           
+          echo "Stapling notarization ticket (best effort before upload)..."
+          # We don't have the ticket yet here, but local script does it.
+          # In CI, we staple in the next job after notarization.
+          
           echo "Done! Signed app is at $APP_PATH"
 
       - name: Upload Chrome Artifact

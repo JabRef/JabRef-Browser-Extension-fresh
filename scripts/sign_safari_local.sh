@@ -43,14 +43,17 @@ find "$APP_PATH" -name "*.md" -delete || true
 echo "Signing all native binaries..."
 find "$APP_PATH" -type f \( -name "*.dylib" -o -name "*.node" -o -name "*.so" \) -exec codesign --force --options runtime --sign "$IDENTITY" --timestamp --verbose=4 {} \;
 
+# Sign the extension bundle specifically if it exists (Inside-out approach)
 EXTENSION_PATH=$(find "$APP_PATH" -name "*.appex")
 if [ -n "$EXTENSION_PATH" ]; then
     echo "Signing extension bundle: $EXTENSION_PATH"
+    # We sign the extension executable specifically too just to be sure
     EXTENSION_EXE=$(find "$EXTENSION_PATH" -path "*/Contents/MacOS/*" -type f)
     if [ -n "$EXTENSION_EXE" ]; then
         echo "Signing extension executable: $EXTENSION_EXE"
         codesign --force --options runtime --entitlements "scripts/JabRef Browser Extension Extension.entitlements" --sign "$IDENTITY" --timestamp --verbose=4 "$EXTENSION_EXE"
     fi
+    echo "Signing extension bundle: $EXTENSION_PATH"
     codesign --force --options runtime --entitlements "scripts/JabRef Browser Extension Extension.entitlements" --sign "$IDENTITY" --timestamp --verbose=4 "$EXTENSION_PATH"
 fi
 
@@ -65,8 +68,13 @@ codesign --force --options runtime --entitlements "scripts/JabRef Browser Extens
 
 echo "Verifying signature..."
 if ! codesign -vvv --deep --strict "$APP_PATH"; then
-    echo "Deep verification failed. Trying strict verification without --deep..."
-    codesign -vvv --strict "$APP_PATH"
+    echo "Deep verification failed. This is sometimes expected with Swift frameworks. Trying strict verification without --deep..."
+    if ! codesign -vvv --strict "$APP_PATH"; then
+        echo "Verification failed even without --deep."
+        ls -la "$APP_PATH"
+        ls -la "$APP_PATH/Contents"
+        exit 1
+    fi
 fi
 
 echo "Done! Signed app is at $APP_PATH"

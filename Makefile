@@ -76,7 +76,8 @@ safari:
                CODE_SIGNING_ALLOWED=NO \
                build
 	# Package the .app
-	cp -R "$(SAFARI_DIR)/build/Build/Products/Release/JabRef Browser Extension.app" "$(SAFARI_DIR)/"
+	# Use ditto to preserve permissions and metadata
+	ditto "$(SAFARI_DIR)/build/Build/Products/Release/JabRef Browser Extension.app" "$(SAFARI_DIR)/JabRef Browser Extension.app"
 
 sign-safari-local:
 	chmod +x scripts/sign_safari_local.sh

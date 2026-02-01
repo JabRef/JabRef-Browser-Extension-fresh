@@ -25,7 +25,10 @@ fi
 echo "Verifying signature before zipping..."
 if ! codesign -vvv --deep --strict "$APP_PATH"; then
     echo "Deep verification failed, trying strict verification without --deep..."
-    codesign -vvv --strict "$APP_PATH"
+    if ! codesign -vvv --strict "$APP_PATH"; then
+        echo "Verification failed even without --deep."
+        exit 1
+    fi
 fi
 
 echo "Zipping app for notarization..."
