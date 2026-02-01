@@ -66,14 +66,26 @@ jobs:
           APP_PATH="$SAFARI_DIR/$APP_NAME.app"
           echo "App path: $APP_PATH"
           
+          # Debug: list the directory to see where the app actually is
+          ls -la "$SAFARI_DIR"
+          
           if [ ! -d "$APP_PATH" ]; then
             echo "Error: App bundle not found at $APP_PATH"
-            ls -R "$SAFARI_DIR"
+            # Try to find where it is
+            find "$SAFARI_DIR" -name "*.app" -maxdepth 2
             exit 1
           fi
 
           echo "Codesigning Safari extension..."
           
+          # Sign the frameworks first
+          echo "Signing frameworks..."
+          if [ -d "$APP_PATH/Contents/Frameworks" ]; then
+            find "$APP_PATH/Contents/Frameworks" -name "*.dylib" -exec codesign --force --options runtime --sign "$IDENTITY" --timestamp --verbose=4 {} \;
+          else
+            echo "No Frameworks directory found."
+          fi
+
           # Sign the extension bundle specifically if it exists (Inside-out approach)
           EXTENSION_PATH=$(find "$APP_PATH" -name "*.appex")
           if [ -n "$EXTENSION_PATH" ]; then
@@ -83,13 +95,21 @@ jobs:
 
           # Sign the main app
           echo "Signing app: $APP_PATH"
-          codesign --force --options runtime --sign "$IDENTITY" --timestamp --verbose=4 --deep "$APP_PATH" || {
+          codesign --force --options runtime --sign "$IDENTITY" --timestamp --verbose=4 "$APP_PATH" || {
             echo "Failed to sign app."
             exit 1
           }
           
           echo "Verifying signature..."
-          codesign -vvv --deep --strict "$APP_PATH"
+          codesign -vvv --deep --strict "$APP_PATH" || {
+            echo "Verification failed. Listing files to debug..."
+            ls -la "$APP_PATH"
+            ls -la "$APP_PATH/Contents"
+            # Try verification without --deep to see if it makes a difference
+            echo "Verifying without --deep..."
+            codesign -vvv --strict "$APP_PATH"
+            exit 1
+          }
           
           echo "Done! Signed app is at $APP_PATH"
 
