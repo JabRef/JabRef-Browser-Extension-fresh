@@ -75,7 +75,7 @@ jobs:
 
           echo "Codesigning Safari extension..."
           
-          # Sign the embedded extension first
+          # Sign the embedded extension
           EXTENSION_PATH=$(find "$APP_PATH" -name "*.appex")
           if [ -z "$EXTENSION_PATH" ]; then
             echo "Error: Extension (.appex) not found in $APP_PATH"
@@ -83,12 +83,19 @@ jobs:
             exit 1
           fi
           
+          echo "Signing binaries in extension..."
+          find "$EXTENSION_PATH" -type f \( -name "*.node" -o -name "*.dylib" -o -name "*.so" \) -print0 | xargs -0 -I {} codesign --force --options runtime --sign "$IDENTITY" --timestamp --verbose=4 {}
+
           echo "Signing extension: $EXTENSION_PATH"
           codesign --force --options runtime --sign "$IDENTITY" --timestamp --verbose=4 "$EXTENSION_PATH" || {
             echo "Failed to sign extension. Checking security find-identity..."
             security find-identity -v -p codesigning
             exit 1
           }
+
+          # Find and sign all remaining nested binaries in the app
+          echo "Signing remaining nested binaries..."
+          find "$APP_PATH" -type f \( -name "*.node" -o -name "*.dylib" -o -name "*.so" \) -print0 | xargs -0 -I {} codesign --force --options runtime --sign "$IDENTITY" --timestamp --verbose=4 {}
           
           # Sign the main app
           echo "Signing app: $APP_PATH"
@@ -134,14 +141,10 @@ jobs:
         uses: actions/download-artifact@v6
         with:
           name: safari-signed-app
-          path: dist/safari/JabRef Browser Extension.app
+          path: dist/safari/
 
       - name: Notarize Safari extension
         run: |
-          # download-artifact@v6 with path "dist/safari/JabRef Browser Extension.app"
-          # will place the contents of the .app (Contents/) directly into that directory.
-          # So dist/safari/JabRef Browser Extension.app IS the bundle.
-          
           echo "Checking app structure..."
           ls -R dist/safari
           
