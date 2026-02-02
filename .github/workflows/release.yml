@@ -149,6 +149,11 @@ jobs:
           # In CI, we staple in the next job after notarization.
           
           echo "Done! Signed app is at $APP_PATH"
+          
+          # Zip the app for better preservation of permissions and easier download
+          cd dist/safari
+          ditto -c -k --keepParent "JabRef Browser Extension.app" "JabRef Browser Extension.app.zip"
+          cd ../..
 
       - name: Upload Chrome Artifact
         uses: actions/upload-artifact@v6
@@ -166,7 +171,7 @@ jobs:
         uses: actions/upload-artifact@v6
         with:
           name: safari-signed-app
-          path: dist/safari/JabRef Browser Extension.app
+          path: dist/safari/JabRef Browser Extension.app.zip
           retention-days: 1
 
 
@@ -182,7 +187,14 @@ jobs:
         uses: actions/download-artifact@v6
         with:
           name: safari-signed-app
-          path: dist/safari/JabRef Browser Extension.app
+          path: dist/safari
+
+      - name: Unzip Signed Safari App
+        run: |
+          cd dist/safari
+          ditto -x -k "JabRef Browser Extension.app.zip" .
+          rm "JabRef Browser Extension.app.zip"
+          cd ../..
 
 
       - name: Notarize Safari extension
@@ -240,13 +252,18 @@ jobs:
           ditto -c -k --keepParent "$APP_PATH" "$FINAL_ZIP"
           
           echo "Done! Notarized app is at $APP_PATH and zip is at $FINAL_ZIP"
+          
+          # Create a zip of the .app for easier testing
+          cd dist/safari
+          ditto -c -k --keepParent "JabRef Browser Extension.app" "JabRef Browser Extension.app.zip"
+          cd ../..
 
 
       - name: Upload Final Notarized Safari App
         uses: actions/upload-artifact@v6
         with:
           name: safari-notarized-app
-          path: dist/safari/JabRef Browser Extension.app
+          path: dist/safari/JabRef Browser Extension.app.zip
 
       - name: Upload Safari Artifact
         uses: actions/upload-artifact@v6
