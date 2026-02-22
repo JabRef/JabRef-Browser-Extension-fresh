@@ -14,7 +14,7 @@
     "@eslint/js": "^10.0.1",
     "@rollup/plugin-commonjs": "^29.0.0",
     "@rollup/plugin-node-resolve": "^16.0.0",
-    "eslint": "^10.0.0",
+    "eslint": "^10.0.1",
     "globals": "^17.3.0",
     "rollup": "^4.57.1"
   }
