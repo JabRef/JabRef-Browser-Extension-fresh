@@ -156,19 +156,19 @@ jobs:
           cd ../..
 
       - name: Upload Chrome Artifact
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: chrome-extension
           path: dist/chrome/jabref-browser-extension-chrome.zip
 
       - name: Upload Firefox Artifact
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: firefox-extension
           path: dist/firefox/jabref-browser-extension-firefox.xpi
 
       - name: Upload Signed Safari App (Internal)
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: safari-signed-app
           path: dist/safari/JabRef Browser Extension.app.zip
@@ -260,13 +260,13 @@ jobs:
 
 
       - name: Upload Final Notarized Safari App
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: safari-notarized-app
           path: dist/safari/JabRef Browser Extension.app.zip
 
       - name: Upload Safari Artifact
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: safari-extension
           path: dist/safari/jabref-browser-extension-safari.zip
