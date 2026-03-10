@@ -1,45 +1,111 @@
 <!doctype html>
 <html lang="en">
-    <head>
-        <meta charset="utf-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <title>JabRef Browser Extension Settings</title>
-        <style>
-            body {
-                font-family: Arial, sans-serif;
-                padding: 16px;
-            }
-            label {
-                display: block;
-                margin-bottom: 8px;
-            }
-            input {
-                padding: 6px;
-                width: 120px;
-            }
-            button {
-                margin-top: 12px;
-                padding: 6px 10px;
-            }
-            .msg {
-                margin-top: 10px;
-                color: green;
-            }
-        </style>
-    </head>
-    <body>
-        <h1>JabRef Browser Extension — Settings</h1>
-        <label for="portInput">JabRef HTTP port (localhost)</label>
-        <input id="portInput" type="number" min="1" max="65535" value="23119" />
-        <div style="font-size: 0.9em; color: #666; margin-top: 6px">
-            Default: 23119
-        </div>
-        <div>
-            <button id="saveBtn">Save</button>
-            <button id="cancelBtn">Cancel</button>
-        </div>
-        <div id="msg" class="msg" role="status" aria-live="polite"></div>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>JabRef Browser Extension Settings</title>
+    <link rel="stylesheet" href="popup.css" />
+    <style>
+      body { padding: 20px; max-width: 420px; margin: 0 auto; }
+      .settings-page-title {
+        font-size: 18px; font-weight: 700;
+        margin-bottom: 20px;
+        display: flex; align-items: center; gap: 8px;
+      }
+      .settings-page-title img { width: 20px; height: 20px; }
+      .msg {
+        font-size: 12px; margin-top: 8px;
+        padding: 6px 10px; border-radius: 6px;
+        display: none;
+      }
+      .msg.visible { display: block; }
+      .msg.success { background: var(--color-success-light); color: var(--color-success); }
+      .msg.error { background: #ffebee; color: var(--color-error); }
+    </style>
+  </head>
+  <body>
+    <div class="settings-page-title">
+      <img src="JabRef-icon-16.png" alt="JabRef" /> JabRef Extension Settings
+    </div>
 
-        <script src="settings.js"></script>
-    </body>
+    <div class="setting-section-title">Connection</div>
+    <div class="setting-group">
+      <label class="setting-label">JabRef port</label>
+      <div class="setting-hint">Must match the port in JabRef &#8594; Preferences &#8594; Browser Extension.</div>
+      <input class="setting-input" id="settingPort" type="number" value="23119" min="1" max="65535" />
+    </div>
+
+    <hr class="setting-divider" />
+    <div class="setting-section-title">Import behavior</div>
+
+    <div class="setting-group">
+      <div class="setting-toggle">
+        <label class="toggle-switch">
+          <input type="checkbox" id="settingAutoImport" />
+          <span class="toggle-track"></span>
+          <span class="toggle-thumb"></span>
+        </label>
+        <span class="toggle-label">Auto-import on popup open</span>
+      </div>
+      <div class="setting-hint" style="margin-top:4px; margin-left:44px">
+        Automatically send detected entries to JabRef when the popup opens.
+      </div>
+    </div>
+
+    <div class="setting-group">
+      <div class="setting-toggle">
+        <label class="toggle-switch">
+          <input type="checkbox" id="settingLaunchJabRef" checked />
+          <span class="toggle-track"></span>
+          <span class="toggle-thumb"></span>
+        </label>
+        <span class="toggle-label">Launch JabRef when not running</span>
+      </div>
+      <div class="setting-hint" style="margin-top:4px; margin-left:44px">
+        Use the protocol handler to start JabRef when it is not reachable.
+      </div>
+    </div>
+
+    <div class="setting-group">
+      <div class="setting-toggle">
+        <label class="toggle-switch">
+          <input type="checkbox" id="settingAutoImportWatchlist" />
+          <span class="toggle-track"></span>
+          <span class="toggle-thumb"></span>
+        </label>
+        <span class="toggle-label">Auto-import watchlist</span>
+      </div>
+      <div class="setting-hint" style="margin-top:4px; margin-left:44px">
+        Automatically import all watchlist entries when JabRef becomes reachable.
+      </div>
+    </div>
+
+    <hr class="setting-divider" />
+    <div class="setting-section-title">Keyboard shortcut</div>
+
+    <div class="setting-group">
+      <div class="shortcut-row">
+        <span class="shortcut-label">Direct import</span>
+        <div class="shortcut-display">
+          <span class="kbd">Alt</span><span class="kbd-sep">+</span><span class="kbd">Shift</span><span class="kbd-sep">+</span><span class="kbd">J</span>
+        </div>
+      </div>
+    </div>
+
+    <hr class="setting-divider" />
+    <div class="setting-section-title">Account</div>
+
+    <div class="setting-group">
+      <button class="btn btn-disconnect" id="disconnectBtn">
+        Disconnect from JabRef
+      </button>
+      <div class="setting-hint" style="margin-top:8px; text-align:center">
+        Revokes the current token. You will need to pair again with a new PIN.
+      </div>
+    </div>
+
+    <div id="msg" class="msg" role="status" aria-live="polite"></div>
+
+    <script src="settings.js"></script>
+  </body>
 </html>

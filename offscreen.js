@@ -21,8 +21,7 @@ browser.runtime.onMessage.addListener(async (msg, sender, sendResponse) => {
     for (const t of list) {
       try {
         const translatorUrl = browser.runtime.getURL(t);
-        const mod = await import(translatorUrl);
-        const result = await runTranslatorOnHtml(mod, html, url);
+        const result = await runTranslatorOnHtml(translatorUrl, html, url);
         if (result !== null && typeof result !== 'undefined') {
           await browser.runtime.sendMessage({ type: 'offscreenResult', url, result });
           sendResponse({ ok: true });
