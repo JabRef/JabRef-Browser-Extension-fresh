@@ -400,7 +400,7 @@ function initSettingsListeners() {
   document.getElementById('disconnectBtn').addEventListener('click', async () => {
     await api.clearToken();
     appendLog('Token cleared. You need to pair again.', 'warning');
-    setState({ needsPairing: true, connected: false });
+    setState({ needsPairing: true, connected: false, settingsOpen: false });
   });
 }
 
