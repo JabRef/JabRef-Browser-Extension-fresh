@@ -20,6 +20,7 @@ export async function runTranslatorOnHtml(
 ) {
   console.debug("[translatorRunner] runTranslatorOnHtml start");
   let loaded;
+  let _iframeRef = null;
   try {
     if (typeof translatorModuleOrPath === "string") {
       console.debug(
@@ -129,25 +130,43 @@ export async function runTranslatorOnHtml(
       (translatorModuleOrPath.startsWith('chrome-extension://') || translatorModuleOrPath.startsWith('moz-extension://') || translatorModuleOrPath.startsWith('ms-browser-extension://')) &&
       typeof document !== 'undefined' && typeof document.createElement === 'function'
     ) {
+      // Persistent documents (offscreen) accumulate globals from every
+      // translator that was injected via <script> tags.  When switching
+      // translators the old globals (detectWeb/doWeb) remain and shadow
+      // the new ones — or worse, the new injection fails entirely because
+      // const/let declarations cannot be redeclared.  Use an iframe to
+      // give each translator a fresh global scope.
+      let iframe;
       try {
-        // Create a non-inline script element pointing to the translator file URL
-        // so execution complies with CSP 'script-src "self"'. Wait for it to load.
+        iframe = document.createElement('iframe');
+        iframe.style.display = 'none';
+        iframe.srcdoc = '<!DOCTYPE html><html><head></head><body></body></html>';
+        document.body.appendChild(iframe);
+        await new Promise(r => { iframe.onload = r; });
+
+        const iWin = iframe.contentWindow;
+        const iDoc = iframe.contentDocument;
+
         await new Promise((resolve, reject) => {
-          const script = document.createElement('script');
+          const script = iDoc.createElement('script');
           script.src = translatorModuleOrPath;
           script.type = 'text/javascript';
-          script.onload = () => { try { script.remove(); resolve(); } catch (err) { console.debug('[translatorRunner] script.remove failed', err); resolve(); } };
-          script.onerror = (err) => { try { script.remove(); } catch (err2) { console.debug('[translatorRunner] script.remove failed', err2); } ; reject(err || new Error('Script load error')); };
-          (document.head || document.documentElement).appendChild(script);
+          script.onload = () => resolve();
+          script.onerror = (err) => reject(err || new Error('Script load error'));
+          (iDoc.head || iDoc.documentElement).appendChild(script);
         });
+
+        _iframeRef = iframe;
         module = {
-          detect: root.detect,
-          detectWeb: root.detectWeb,
-          translate: root.translate,
-          doWeb: root.doWeb,
+          detect: iWin.detect,
+          detectWeb: iWin.detectWeb,
+          translate: iWin.translate,
+          doWeb: iWin.doWeb,
+          __iframe: iframe,
         };
       } catch (e) {
-        console.warn('[translatorRunner] browser script-src fallback failed', e);
+        console.warn('[translatorRunner] iframe script injection failed', e);
+        if (iframe) { try { iframe.remove(); } catch { /* ignore */ } }
       }
     }
 
@@ -171,9 +190,13 @@ export async function runTranslatorOnHtml(
     );
 
     // Provide minimal ZU/Zotero shims before detection: some translators use ZU in detectWeb()
+    // When running in an iframe, shims must go into the iframe's window
+    // because the translator's closures reference their own global scope.
+    const shimTarget = (module && module.__iframe) ? module.__iframe.contentWindow : root;
     try {
       const ZU = createZU(doc, { baseUrl: url });
       const Zotero = createZoteroShim();
+      installShims(shimTarget, doc, url, ZU, Zotero);
       installShims(root, doc, url, ZU, Zotero);
       if (module && module.__vmContext) installShims(module.__vmContext, doc, url, ZU, Zotero);
     } catch (e) {
@@ -253,10 +276,13 @@ export async function runTranslatorOnHtml(
       const ZU = createZU(doc, { baseUrl: url });
       const Zotero = createZoteroShim();
       const root = typeof window !== "undefined" ? window : globalThis;
+      const doWebShimTarget = (module && module.__iframe) ? module.__iframe.contentWindow : root;
+      installShims(doWebShimTarget, doc, url, ZU, Zotero);
       installShims(root, doc, url, ZU, Zotero);
       // Ensure ZU.requestDocument resolves relative URLs as well and
       // install shims into the VM context if present.
       try {
+        doWebShimTarget.ZU.requestDocument = doWebShimTarget.requestDocument;
         root.ZU.requestDocument = root.requestDocument;
         if (module && module.__vmContext) installShims(module.__vmContext, doc, url, ZU, Zotero);
       } catch (err) { console.debug('[translatorRunner] non-fatal shim setup issue', err); }
@@ -288,6 +314,7 @@ export async function runTranslatorOnHtml(
           new Promise((resolve) => {
             const start = Date.now();
             (function check() {
+              if (doWebShimTarget.Zotero && doWebShimTarget.Zotero._lastItem) return resolve();
               if (root.Zotero && root.Zotero._lastItem) return resolve();
               if (Date.now() - start > timeout) return resolve();
               setTimeout(check, 50);
@@ -301,7 +328,8 @@ export async function runTranslatorOnHtml(
       // After doWeb, many translators call Zotero.loadTranslator('import') and then item.complete().
       // Use Zotero._lastItem (provided by the shim) as the produced item and create a BibTeX fallback.
       let produced =
-        root.Zotero && root.Zotero._lastItem ? root.Zotero._lastItem : null;
+        (doWebShimTarget.Zotero && doWebShimTarget.Zotero._lastItem) ||
+        (root.Zotero && root.Zotero._lastItem) || null;
       console.debug('[translatorRunner] produced item raw:', produced);
       if (!produced) {
         // No produced item from translator flows; attempt to build a
@@ -448,6 +476,9 @@ export async function runTranslatorOnHtml(
 
     throw new Error("Translator missing translate() and doWeb()");
   } finally {
+    if (_iframeRef) {
+      try { _iframeRef.remove(); } catch { /* ignore */ }
+    }
     console.debug("[translatorRunner] runTranslatorOnHtml end");
   }
 }
