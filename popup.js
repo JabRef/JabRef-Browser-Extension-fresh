@@ -415,7 +415,7 @@ async function runDetection() {
     const tab = tabs && tabs[0];
     const url = tab && tab.url ? tab.url : '';
 
-    if (!url || url.startsWith('chrome://') || url.startsWith('about:') || url.startsWith('chrome-extension://')) {
+    if (!url || url.startsWith('chrome://') || url.startsWith('about:') || url.startsWith('chrome-extension://') || url.startsWith('moz-extension://') || url.startsWith('safari-extension://')) {
       setState({ importState: ImportState.NO_METADATA });
       return;
     }

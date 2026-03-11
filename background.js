@@ -146,7 +146,7 @@ browser.commands.onCommand.addListener(async (command) => {
     const tab = tabs && tabs[0];
     const url = tab && tab.url ? tab.url : '';
 
-    if (!url || url.startsWith('chrome://') || url.startsWith('about:') || url.startsWith('chrome-extension://') || url.startsWith('moz-extension://')) {
+    if (!url || url.startsWith('chrome://') || url.startsWith('about:') || url.startsWith('chrome-extension://') || url.startsWith('moz-extension://') || url.startsWith('safari-extension://')) {
       console.debug('[background] skipping non-web URL:', url);
       return;
     }

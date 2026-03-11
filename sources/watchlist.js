@@ -1,5 +1,6 @@
 /**
- * Watchlist stored in browser.storage.sync for cross-device syncing.
+ * Watchlist stored in browser.storage.sync (Chrome/Firefox) with automatic
+ * fallback to browser.storage.local (Safari, which lacks sync support).
  * Each entry: { id, bibtex, title, citationKey, savedAt }
  */
 
@@ -9,13 +10,15 @@ if (typeof browser === 'undefined' && typeof chrome !== 'undefined') {
   globalThis.browser = chrome;
 }
 
+const storage = browser.storage.sync || browser.storage.local;
+
 async function load() {
-  const res = await browser.storage.sync.get({ [STORAGE_KEY]: [] });
+  const res = await storage.get({ [STORAGE_KEY]: [] });
   return res[STORAGE_KEY] || [];
 }
 
 async function save(entries) {
-  await browser.storage.sync.set({ [STORAGE_KEY]: entries });
+  await storage.set({ [STORAGE_KEY]: entries });
 }
 
 function parseBibtexMeta(bibtex) {
