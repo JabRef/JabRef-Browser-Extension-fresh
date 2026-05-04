@@ -13,28 +13,100 @@ _Please post any issues or suggestions [here on GitHub](https://github.com/JabRe
 
 ## Key Features
 
-- Automatic detection and conversion: detects embedded BibTeX or RIS blocks, and can run local translators matched via `translators/manifest.json`.
-- Legacy Zotero translators: many Zotero legacy translators run in an offscreen runner with small `ZU`/`Zotero` shims.
-- Auto-send: when a BibTeX entry is produced, the popup will forward it to JabRef if JabRef is reachable over HTTP.
-- Persistent logs: popup console messages are persisted to `chrome.storage.local` to aid debugging.
-- Direct HTTP POST to JabRef (no external bridge required).
+- **Automatic detection**: detects embedded BibTeX or RIS blocks on the current page using Zotero translators.
+- **Authenticated HTTP communication**: sends entries to JabRef over HTTP with token-based authentication (PIN pairing).
+- **Protocol handler fallback**: launches JabRef via `jabref://` when it is not running, then retries the import automatically.
+- **Watchlist**: save entries locally for later import, synced across browsers via `browser.storage.sync`.
+- **Direct-import keyboard shortcut**: press <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>J</kbd> to import the current page directly into JabRef.
+- **Modern UI**: clean, modern popup with import/watchlist tabs, inline settings, and pairing flow.
 
 ## Installation
 
-### Install and Configure JabRef
+### 1. Install JabRef
 
-- Download JabRef from the official site: <https://www.jabref.org/> and choose the installer or application bundle appropriate for your OS. **Currently you need to use the latest 6.0 alpha release**.
-- Install and start JabRef using the normal installer or by running the downloaded application bundle.
-- In JabRef open the application's Preferences `File -> Preferences`.
-- Enable the listener as shown in the screenshot. Leave the default port, `23119`, or pick another port and remember it for the extension settings.
+Download JabRef from <https://www.jabref.org/> and install it normally.
+Use the **installer** (not the portable version) so that the `jabref://` protocol handler is registered automatically.
 
-   ![JabRef Preferences Screenshot](./assets/jabref_settings.png)
+> **Note:** The authenticated communication and protocol handler require JabRef 6.0 or later.
 
-### Extension Configuration
+### 2. Enable the HTTP server in JabRef
 
-The extension a settings page where you can configure the port used to connect to JabRef. Make sure it matches the port configured in JabRef's preferences (default `23119`).
+Open JabRef and go to **File → Preferences → Network**.
+Enable the HTTP server and note the port (default `23119`).
 
-![Extension Settings Screenshot](./assets/extension_settings.png)
+![JabRef Preferences](./assets/jabref_settings.png)
+
+### 3. Install the browser extension
+
+Install the extension from your browser's store:
+
+> [Firefox](https://addons.mozilla.org/en-US/firefox/addon/jabref/?src=external-github) -  [Chrome](https://chrome.google.com/webstore/detail/jabref-browser-extension/bifehkofibaamoeaopjglfkddgkijdlh) - [Edge](https://microsoftedge.microsoft.com/addons/detail/pgkajmkfgbehiomipedjhoddkejohfna) - [Vivaldi](https://chrome.google.com/webstore/detail/jabref-browser-extension/bifehkofibaamoeaopjglfkddgkijdlh)
+
+### 4. Pair the extension with JabRef
+
+The first time you use the extension and try to import an entry, it needs to pair with your JabRef instance.
+This is a one-time setup that establishes a secure connection.
+
+1. Make sure JabRef is running.
+2. Navigate to a page with bibliographic data (e.g., [arXiv](https://arxiv.org/abs/1910.01108), Google Scholar, publisher sites).
+3. Click the JabRef extension icon in your browser toolbar and click on "Import to JabRef".
+4. The popup detects that it is not paired and shows a **PIN input**.
+
+![PIN Input Mask](./assets/pin_input.png)
+
+1. Open JabRef and go to **File → Preferences → Network**.
+2. Generate a new **6-digit PIN** which is valid for 5 minutes. Enter it in the extension.
+
+![JabRef Settings PIN](./assets/jabref_settings_pin.png)
+
+1. The extension verifies the PIN and shows **Connected**. You are ready to go.
+
+The pairing is persistent - you only need to do this once per browser.
+If you reinstall JabRef or clear the extension data, repeat the pairing.
+
+## Usage
+
+### Import from popup
+
+1. Navigate to a page with bibliographic data (e.g., [arXiv](https://arxiv.org/abs/1910.01108), Google Scholar, publisher sites).
+2. Click the extension icon. The popup detects metadata automatically.
+3. Click **Import to JabRef**. The entry appears in your currently active JabRef library.
+
+![Import Panel](./assets/import.png)
+
+If JabRef is not running, the extension launches it via the `jabref://` protocol handler, waits for it to start, and retries the import automatically.
+
+### Direct import via keyboard shortcut
+
+Press <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>J</kbd> on any supported page to import directly into JabRef without opening the popup.
+
+### Watchlist
+
+Click **+ Watch** to save an entry for later import.
+Watchlist entries are synced across browsers by your browser account.
+Switch to the **Watchlist** tab to review, import, or remove saved entries.
+
+![Watchlist Panel](./assets/watchlist.png)
+
+### Settings
+
+Click the **gear icon** in the popup header to access settings:
+
+- **Port** - must match JabRef's HTTP server port (default `23119`)
+- **Auto-import on popup open** - Automatically send detected entries to JabRef when the popup opens
+- **Launch JabRef when not running** - trigger the protocol handler when JabRef is not running
+- **Auto-import watchlist** - automatically import all watchlist entries when JabRef becomes reachable
+- **Disconnect** - revoke the current pairing token
+
+![Settings Panel](./assets/settings.png)
+
+### Troubleshooting
+
+- **"JabRef not reachable"** - Make sure JabRef is running and the HTTP server is enabled in preferences. Check that the port matches.
+- **"Pairing required"** - Click the pairing panel and enter the PIN shown in JabRef (Preferences → General → HTTP Server).
+- **Protocol handler not working** - Make sure you installed JabRef using the installer, not the portable version. On first use, your browser will ask permission to open `jabref://` links.
+- **Keyboard shortcut not working** - Go to `chrome://extensions/shortcuts` (Chrome) or `about:addons` → gear icon → Manage Extension Shortcuts (Firefox) and verify the shortcut is assigned.
+- Open the popup DevTools (right-click the popup → Inspect) to view detailed logs.
 
 ### Developer mode install
 
@@ -66,14 +138,14 @@ Note: Loading the extension this way is temporary in Firefox and will be removed
 
 1. Start JabRef and ensure remote operation is enabled.
 2. Open the extension popup from the toolbar.
-3. The popup attempts automatic detection on the active tab; if it finds or converts a BibTeX entry it will populate the textbox and attempt to send it to JabRef.
+3. The popup attempts automatic detection on the active tab; if it finds or converts a BibTeX entry it will populate the textbox.
    For example, [the arXiv](http://arxiv.org/list/gr-qc/pastweek?skip=0&show=5) and click the JabRef symbol in the Firefox search bar (or press <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>J</kbd>).
-   You can also select and run local translators from the manifest via the popup UI.
-4. Once the JabRef browser extension has extracted the references and downloaded the associated PDF's, the import window of JabRef opens.
+4. Once the JabRef browser extension has extracted the references you can import it into JabRef or save it to your watchlist.
 
 Notes:
 
 - If the popup cannot connect to JabRef, check the configured port in the extension settings and that JabRef is running and listening for HTTP requests.
+- Ensure the extension is succesfully paired with JabRef.
 - Open the popup DevTools (right-click → Inspect) to view logs when debugging translators or connection issues.
 
 ## About this Add-On
@@ -124,14 +196,18 @@ The final notarized and zipped extension will be at `dist/safari/jabref-browser-
 
 ```text
 JabRef Browser Extension/
-├── popup.html
-├── popup.js            # UI, translator loading, HTTP send logic
-├── popup.css
-├── offscreen.html      # Offscreen context used to run legacy translators
-├── offscreen.js
-├── sources/            # helpers (ris parser, translator runner, adapters)
-├── translators/        # bundled translators + manifest.json
-└── README.md
+├── popup.html / .css / .js   # Popup UI with state machine, import/watchlist/pairing
+├── background.js             # Service worker: translator execution, direct-import shortcut
+├── offscreen.html / .js      # Offscreen context for Chrome translator execution
+├── settings.html / .js       # Browser options page (mirrors popup settings overlay)
+├── sources/
+│   ├── jabref-api.js         # HTTP client: health check, send BibTeX, pairing, poll
+│   ├── watchlist.js          # Watchlist CRUD (chrome.storage.sync)
+│   ├── translatorRunner.js   # Zotero translator execution engine
+│   ├── zoteroShims.js        # Zotero API compatibility layer
+│   └── vendor/linkedom.js    # DOM parser for background context
+├── translators/              # Bundled Zotero translators + manifest.json
+└── manifest.json             # MV3 manifest with commands section
 ```
 
 ### Testing

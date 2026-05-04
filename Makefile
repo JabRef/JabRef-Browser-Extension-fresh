@@ -14,14 +14,7 @@ chrome: $(CHROME_ZIP)
 
 $(CHROME_ZIP):
 	mkdir -p $(CHROME_DIR)
-	# For Chrome, we need to move browser_specific_settings.chrome.background to top-level background
-	cp manifest.json $(CHROME_DIR)/manifest.json
-	python3 -c "import json; m=json.load(open('$(CHROME_DIR)/manifest.json')); \
-		m['background'] = m.get('browser_specific_settings', {}).get('chrome', {}).get('background', m['background']); \
-		json.dump(m, open('$(CHROME_DIR)/manifest.json', 'w'), indent=2)"
-	zip -r $(CHROME_ZIP) . -x "dist/*" ".git/*" "scripts/*" "sources/vendor/linkedom.js" "manifest.json"
-	cd $(CHROME_DIR) && zip -u ../../$(CHROME_ZIP) manifest.json
-	rm $(CHROME_DIR)/manifest.json
+	zip -r $(CHROME_ZIP) . -x "dist/*" ".git/*" "scripts/*" "sources/vendor/linkedom.js"
 
 firefox: $(FIREFOX_XPI)
 
@@ -64,6 +57,12 @@ safari:
 	find /tmp/jabref-safari-src -name "__pycache__" -type d -exec rm -rf {} +
 	find /tmp/jabref-safari-src -name "*.md" -delete
 	rm -rf /tmp/jabref-safari-src/build
+	# Strip Chrome-only "offscreen" permission and replace service_worker with background page for Safari <16.4 compat
+	python3 -c "import json; \
+		m=json.load(open('/tmp/jabref-safari-src/manifest.json')); \
+		m['permissions'] = [p for p in m.get('permissions', []) if p != 'offscreen']; \
+		m['background'] = {'page': 'background.html', 'persistent': False}; \
+		json.dump(m, open('/tmp/jabref-safari-src/manifest.json', 'w'), indent=2)"
 	xcrun safari-web-extension-converter /tmp/jabref-safari-src --project-location $(SAFARI_DIR) --macos-only --no-open --no-prompt --bundle-identifier org.jabref.JabRef-Browser-Extension --force --copy-resources --app-name "JabRef Browser Extension"
 	rm -rf /tmp/jabref-safari-src
 	# Build the extension to produce the .app

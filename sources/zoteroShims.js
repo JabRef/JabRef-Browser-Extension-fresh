@@ -333,7 +333,7 @@ export function installShims(target, doc, url, ZU, Zotero) {
   // Provide core shims as best-effort.
   safeAssign(target, 'ZU', ZU);
   safeAssign(target, 'Zotero', Zotero);
-  safeAssign(target, 'Z', { debug: () => { }, monitorDOMChanges: () => { }, getHiddenPref: () => false });
+  safeAssign(target, 'Z', { debug: () => { }, monitorDOMChanges: () => { }, getHiddenPref: () => false, Item: Zotero ? Zotero.Item : undefined });
   safeAssign(target, 'doc', doc);
   // `document` may be a getter-only property in some contexts; attempt
   // to install but don't let it abort shim setup.
