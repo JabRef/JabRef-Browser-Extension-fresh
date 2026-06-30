@@ -14,10 +14,14 @@ chrome: $(CHROME_ZIP)
 
 $(CHROME_ZIP):
 	mkdir -p $(CHROME_DIR)
-	# For Chrome, we need to move browser_specific_settings.chrome.background to top-level background
+	# For Chrome, we need to move browser_specific_settings.chrome.background to top-level background,
+	# and add the Chrome-only "offscreen" permission (Firefox rejects it as unknown).
 	cp manifest.json $(CHROME_DIR)/manifest.json
 	python3 -c "import json; m=json.load(open('$(CHROME_DIR)/manifest.json')); \
 		m['background'] = m.get('browser_specific_settings', {}).get('chrome', {}).get('background', m['background']); \
+		perms = m.get('permissions', []); \
+		perms.insert(perms.index('storage') if 'storage' in perms else 0, 'offscreen'); \
+		m['permissions'] = perms; \
 		json.dump(m, open('$(CHROME_DIR)/manifest.json', 'w'), indent=2)"
 	zip -r $(CHROME_ZIP) . -x "dist/*" ".git/*" "scripts/*" "sources/vendor/linkedom.js" "manifest.json"
 	cd $(CHROME_DIR) && zip -u ../../$(CHROME_ZIP) manifest.json
