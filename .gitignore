@@ -237,3 +237,8 @@ test_cache/
 test_results/
 *.log
 build/
+
+# Chrome packaging private key (public key lives in manifest.json:key).
+# Keep private.pem locally for Chrome Web Store CRX signing; never commit it.
+bridge/chrome-key/private.pem
+bridge/chrome-key/pub.der

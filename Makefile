@@ -6,7 +6,7 @@ CHROME_ZIP := $(CHROME_DIR)/jabref-browser-extension-chrome.zip
 FIREFOX_XPI := $(FIREFOX_DIR)/jabref-browser-extension-firefox.xpi
 SAFARI_XCODE := $(SAFARI_DIR)/JabRef\ Browser\ Extension
 
-.PHONY: all chrome firefox safari clean sign-safari-local notarize-safari-local
+.PHONY: all chrome firefox safari clean sign-safari-local notarize-safari-local bridge-build bridge-build-jvm bridge-install bridge-clean
 
 all: chrome firefox safari
 
@@ -14,10 +14,14 @@ chrome: $(CHROME_ZIP)
 
 $(CHROME_ZIP):
 	mkdir -p $(CHROME_DIR)
-	# For Chrome, we need to move browser_specific_settings.chrome.background to top-level background
+	# For Chrome, we need to move browser_specific_settings.chrome.background to top-level background,
+	# and add the Chrome-only "offscreen" permission (Firefox rejects it as unknown).
 	cp manifest.json $(CHROME_DIR)/manifest.json
 	python3 -c "import json; m=json.load(open('$(CHROME_DIR)/manifest.json')); \
 		m['background'] = m.get('browser_specific_settings', {}).get('chrome', {}).get('background', m['background']); \
+		perms = m.get('permissions', []); \
+		perms.insert(perms.index('storage') if 'storage' in perms else 0, 'offscreen'); \
+		m['permissions'] = perms; \
 		json.dump(m, open('$(CHROME_DIR)/manifest.json', 'w'), indent=2)"
 	zip -r $(CHROME_ZIP) . -x "dist/*" ".git/*" "scripts/*" "sources/vendor/linkedom.js" "manifest.json"
 	cd $(CHROME_DIR) && zip -u ../../$(CHROME_ZIP) manifest.json
@@ -92,3 +96,22 @@ clean:
 
 lint:
 	web-ext lint --ignore-files dist/** --ignore-files scripts/** --ignore-files .git/** --ignore-files test.js
+
+# ---- Native-messaging bridge ----
+# JabRef Browser-Extension Fulltext Protocol companion. See bridge/README.md.
+
+bridge-build:
+	cd bridge && ./build.sh
+
+bridge-build-jvm:
+	cd bridge && ./build.sh --java
+
+bridge-install: bridge-build
+	@case "$$(uname -s)" in \
+	  MINGW*|MSYS*|CYGWIN*) powershell -ExecutionPolicy Bypass -File bridge/install/install.ps1 ;; \
+	  Darwin)               sh bridge/install/install.command ;; \
+	  *)                    sh bridge/install/install.sh ;; \
+	esac
+
+bridge-clean:
+	rm -rf bridge/build

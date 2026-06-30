@@ -34,3 +34,39 @@ jobs:
         fi
     - name: Run tests
       run: npm test
+
+  bridge-smoke:
+    name: Bridge smoke (JVM mode)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '25'
+          distribution: 'temurin'
+      - uses: jbangdev/setup-jbang@main
+      - name: JBang build (JVM, no native-image)
+        working-directory: bridge
+        shell: bash
+        run: |
+          mkdir -p build
+          jbang export portable --force -O build/jabext-experimental.jar JabExtBridge.java
+      - name: Smoke /v1/health
+        working-directory: bridge
+        shell: bash
+        run: |
+          mkfifo keepalive.fifo
+          ( tail -f /dev/null > keepalive.fifo & )
+          java -jar build/jabext-experimental.jar < keepalive.fifo > stdout.log 2> stderr.log &
+          BRIDGE_PID=$!
+          sleep 3
+          cat stderr.log
+          PORT=$(grep -oP 'listening on 127\.0\.0\.1:\K\d+' stderr.log)
+          if [ -z "$PORT" ]; then
+            echo "bridge failed to start" >&2
+            exit 1
+          fi
+          BODY=$(curl -s "http://127.0.0.1:$PORT/v1/health")
+          echo "health: $BODY"
+          echo "$BODY" | grep -q '"ok":true' || { echo "health failed" >&2; exit 1; }
+          kill $BRIDGE_PID || true

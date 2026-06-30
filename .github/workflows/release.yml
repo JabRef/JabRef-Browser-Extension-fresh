@@ -271,10 +271,56 @@ jobs:
           name: safari-extension
           path: dist/safari/jabref-browser-extension-safari.zip
 
+  build-bridge:
+    name: Build bridge (${{ matrix.os_label }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: windows-latest
+            os_label: windows_x86_64
+            artifact: jabext-experimental_windows_x86_64.exe
+            ext: .exe
+          - runner: ubuntu-latest
+            os_label: linux_x86_64
+            artifact: jabext-experimental_linux_x86_64
+            ext: ""
+          - runner: macos-13
+            os_label: macos_x86_64
+            artifact: jabext-experimental_macos_x86_64
+            ext: ""
+          - runner: macos-latest
+            os_label: macos_aarch64
+            artifact: jabext-experimental_macos_aarch64
+            ext: ""
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: graalvm/setup-graalvm@v1
+        with:
+          java-version: '25'
+          distribution: 'graalvm-community'
+      - uses: jbangdev/setup-jbang@main
+      - name: Build native bridge
+        shell: bash
+        working-directory: bridge
+        run: |
+          mkdir -p build
+          # Windows GraalVM CE ships native-image under lib/svm/bin; stage it.
+          if [[ "$RUNNER_OS" == "Windows" ]] && [[ ! -f "$JAVA_HOME/bin/native-image.exe" ]] && [[ -f "$JAVA_HOME/lib/svm/bin/native-image.exe" ]]; then
+            cp "$JAVA_HOME/lib/svm/bin/native-image.exe" "$JAVA_HOME/bin/native-image.exe"
+          fi
+          jbang export native --force -O "build/${{ matrix.artifact }}" JabExtBridge.java
+      - name: Upload bridge artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ matrix.artifact }}
+          path: bridge/build/${{ matrix.artifact }}
+
   release:
     name: Create GitHub Release
-    needs: [ build, notarize-safari ]
-    if: github.event_name != 'workflow_dispatch' && always() && (needs.build.result == 'success') && (needs.notarize-safari.result == 'success' || needs.notarize-safari.result == 'skipped')
+    needs: [ build, notarize-safari, build-bridge ]
+    if: github.event_name != 'workflow_dispatch' && always() && (needs.build.result == 'success') && (needs.notarize-safari.result == 'success' || needs.notarize-safari.result == 'skipped') && (needs.build-bridge.result == 'success' || needs.build-bridge.result == 'skipped')
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -291,4 +337,8 @@ jobs:
             artifacts/chrome-extension/jabref-browser-extension-chrome.zip
             artifacts/firefox-extension/jabref-browser-extension-firefox.xpi
             artifacts/safari-extension/jabref-browser-extension-safari.zip
+            artifacts/jabext-experimental_windows_x86_64.exe/jabext-experimental_windows_x86_64.exe
+            artifacts/jabext-experimental_linux_x86_64/jabext-experimental_linux_x86_64
+            artifacts/jabext-experimental_macos_x86_64/jabext-experimental_macos_x86_64
+            artifacts/jabext-experimental_macos_aarch64/jabext-experimental_macos_aarch64
           generate_release_notes: true
