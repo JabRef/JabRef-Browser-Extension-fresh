@@ -6,7 +6,7 @@ CHROME_ZIP := $(CHROME_DIR)/jabref-browser-extension-chrome.zip
 FIREFOX_XPI := $(FIREFOX_DIR)/jabref-browser-extension-firefox.xpi
 SAFARI_XCODE := $(SAFARI_DIR)/JabRef\ Browser\ Extension
 
-.PHONY: all chrome firefox safari clean sign-safari-local notarize-safari-local
+.PHONY: all chrome firefox safari clean sign-safari-local notarize-safari-local bridge-build bridge-build-jvm bridge-install bridge-clean
 
 all: chrome firefox safari
 
@@ -96,3 +96,22 @@ clean:
 
 lint:
 	web-ext lint --ignore-files dist/** --ignore-files scripts/** --ignore-files .git/** --ignore-files test.js
+
+# ---- Native-messaging bridge ----
+# JabRef Browser-Extension Fulltext Protocol companion. See bridge/README.md.
+
+bridge-build:
+	cd bridge && ./build.sh
+
+bridge-build-jvm:
+	cd bridge && ./build.sh --java
+
+bridge-install: bridge-build
+	@case "$$(uname -s)" in \
+	  MINGW*|MSYS*|CYGWIN*) powershell -ExecutionPolicy Bypass -File bridge/install/install.ps1 ;; \
+	  Darwin)               sh bridge/install/install.command ;; \
+	  *)                    sh bridge/install/install.sh ;; \
+	esac
+
+bridge-clean:
+	rm -rf bridge/build

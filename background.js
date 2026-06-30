@@ -1,6 +1,7 @@
 // background.js
 import { DOMParser as LinkeDOMParser } from './sources/vendor/linkedom.js';
 import { runTranslatorOnHtml } from './sources/translatorRunner.js';
+import { startFulltextBridge } from './fulltextBridge.js';
 
 // Shim DOMParser for environments without it in the background
 if (typeof globalThis.DOMParser === 'undefined') {
@@ -18,6 +19,16 @@ console.debug('[background] module loaded');
 // Provide a minimal compatibility shim: if `browser` is missing, alias it to `chrome`.
 if (typeof browser === "undefined" && typeof chrome !== "undefined") {
   globalThis.browser = chrome;
+}
+
+// Boot the fulltext native-messaging bridge. The Java bridge process
+// (bridge/JabExtBridge.java) hosts the loopback HTTP server JabRef talks to.
+// Reconnect on SW restart by attempting on every module load; the bridge no-ops
+// when the port is already alive.
+try {
+  startFulltextBridge();
+} catch (e) {
+  console.debug('[background] fulltext bridge unavailable:', e);
 }
 
 browser.runtime.onMessage.addListener((msg, sender, sendResponse) => {

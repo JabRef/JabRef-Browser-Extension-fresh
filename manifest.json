@@ -3,7 +3,7 @@
   "name": "JabRef Browser Extension",
   "version": "1.0.2",
   "description": "Connect to JabRef via 6.0 HTTP Interface and send bibliography entries",
-  "permissions": ["tabs", "storage", "activeTab"],
+  "permissions": ["tabs", "storage", "activeTab", "scripting", "downloads", "nativeMessaging"],
   "host_permissions": ["<all_urls>"],
   "options_ui": {
     "page": "settings.html",
@@ -40,9 +40,10 @@
       ]
     }
   ],
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAsV6W8UCeabay23EoeOdKvZQr8cUMGAdbh2HAIUWHcG4hlIvS6YNUDBLmq+NFPe9ODAUAqVQeCYKS+fN5BovEAKHInakGWvqH2WnWIxsxQRBLrmIp466N5XihR8dAp35ONpfosiPhevfI8yTJk1EestExmIwJp/kbn1Gcu8vyuxicxRqUx0DxGM30+GFFCVfx2+D9giRpiUczMeHXZJ8eX4hbHUE/Yt/ukuCFT2dkcdpJnmi468FCSFAJ0JXUYSf/QkUmihhtNeyrMplgPrz6J5sJVWarp/bQkVZG03EUDmnkjW9e25Guprqq6spZ+XrGtisq8wSEmam0QtPj1p5kmQIDAQAB",
   "browser_specific_settings": {
     "gecko": {
-      "id": "browser-extension@jabref",
+      "id": "browser-extension-experimental@jabref",
       "data_collection_permissions": {
         "required": [
           "none"
